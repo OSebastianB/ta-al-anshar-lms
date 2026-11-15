@@ -245,6 +245,13 @@ class _LoginCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          _RoleOption(
+            label: 'Kepala Sekolah',
+            icon: Icons.apartment_outlined,
+            selected: role == AppRole.kepalaSekolah,
+            onTap: () => onRole(AppRole.kepalaSekolah),
+          ),
           const SizedBox(height: 6),
           Text(
             'Admin tetap menggunakan website desktop.',

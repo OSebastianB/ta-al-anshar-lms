@@ -66,11 +66,12 @@ class LmsAppBar extends AppBar {
            Builder(
              builder: (context) {
                final role = SessionScope.of(context).role;
-               final unread =
-                   unreadOverride ??
-                   (role == AppRole.orangTua
-                       ? DummyData.parentUnreadCount
-                       : DummyData.unreadCount);
+               final unread = unreadOverride ??
+                   switch (role) {
+                     AppRole.orangTua => DummyData.parentUnreadCount,
+                     AppRole.kepalaSekolah => DummyData.kepsekUnreadCount,
+                     _ => DummyData.unreadCount,
+                   };
                return IconButton(
                  tooltip: 'Notifikasi',
                  onPressed: () {

@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-enum AppRole { guru, orangTua }
+enum AppRole { guru, orangTua, kepalaSekolah }
 
 class SessionController extends ChangeNotifier {
   AppRole? role;

@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'screens/guru/guru_shell.dart';
+import 'screens/kepsek/kepsek_shell.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/orangtua/orangtua_shell.dart';
 import 'state/session_controller.dart';
@@ -44,6 +45,7 @@ class _LmsAppState extends State<LmsApp> {
               null => const LoginScreen(),
               AppRole.guru => const GuruShell(),
               AppRole.orangTua => const OrangtuaShell(),
+              AppRole.kepalaSekolah => const KepsekShell(),
             },
           );
         },

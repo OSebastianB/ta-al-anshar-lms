@@ -20,9 +20,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final role = SessionScope.of(context).role;
-    final source = role == AppRole.orangTua
-        ? DummyData.parentNotices
-        : DummyData.notices;
+    final source = switch (role) {
+      AppRole.orangTua => DummyData.parentNotices,
+      AppRole.kepalaSekolah => DummyData.kepsekNotices,
+      _ => DummyData.notices,
+    };
+    final unread = switch (role) {
+      AppRole.orangTua => DummyData.parentUnreadCount,
+      AppRole.kepalaSekolah => DummyData.kepsekUnreadCount,
+      _ => DummyData.unreadCount,
+    };
     final items = _filter == null
         ? source
         : source.where((item) => item.kind == _filter).toList();
@@ -32,9 +39,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       appBar: LmsAppBar(
         title: 'Notifikasi',
         showBack: true,
-        unreadOverride: role == AppRole.orangTua
-            ? DummyData.parentUnreadCount
-            : DummyData.unreadCount,
+        unreadOverride: unread,
       ),
       body: ListView(
         physics: const ClampingScrollPhysics(),

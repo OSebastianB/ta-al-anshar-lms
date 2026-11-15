@@ -62,4 +62,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Kehadiran anak'), findsOneWidget);
   });
+
+  testWidgets('Login kepala sekolah membuka dashboard monitoring', (tester) async {
+    await pumpPhone(tester, const LmsApp());
+    await tester.tap(find.text('Kepala Sekolah'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField).at(0), 'kepsek@alanshar.sch.id');
+    await tester.enterText(find.byType(TextField).at(1), 'demo');
+    await tester.tap(find.widgetWithText(FilledButton, 'Login'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pak Hidayat Rahman'), findsOneWidget);
+    expect(find.text('Jadwal menunggu persetujuan'), findsOneWidget);
+
+    await tester.tap(find.text('Persetujuan'));
+    await tester.pumpAndSettle();
+    expect(find.text('Persetujuan jadwal CSP'), findsOneWidget);
+  });
 }

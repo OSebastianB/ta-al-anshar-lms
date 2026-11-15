@@ -136,6 +136,101 @@ class ChildAttendanceDay {
   final String note;
 }
 
+enum ScheduleApprovalStatus { menunggu, disetujui, revisi }
+
+class ChartPoint {
+  const ChartPoint({required this.label, required this.value});
+
+  final String label;
+  final double value;
+}
+
+class ClassAttendanceStat {
+  const ClassAttendanceStat({
+    required this.className,
+    required this.presentPercent,
+    required this.studentCount,
+  });
+
+  final String className;
+  final double presentPercent;
+  final int studentCount;
+}
+
+class TeacherAttendanceStat {
+  const TeacherAttendanceStat({
+    required this.name,
+    required this.presentPercent,
+    required this.statusToday,
+  });
+
+  final String name;
+  final double presentPercent;
+  final AttendanceStatus statusToday;
+}
+
+class SchoolScheduleItem {
+  const SchoolScheduleItem({
+    required this.start,
+    required this.end,
+    required this.subject,
+    required this.className,
+    required this.teacher,
+    required this.room,
+  });
+
+  final String start;
+  final String end;
+  final String subject;
+  final String className;
+  final String teacher;
+  final String room;
+}
+
+class ScheduleApprovalItem {
+  ScheduleApprovalItem({
+    required this.id,
+    required this.title,
+    required this.academicYear,
+    required this.semester,
+    required this.generatedAt,
+    required this.classCount,
+    required this.teacherCount,
+    required this.summary,
+    required this.details,
+    required this.status,
+  });
+
+  final String id;
+  final String title;
+  final String academicYear;
+  final String semester;
+  final String generatedAt;
+  final int classCount;
+  final int teacherCount;
+  final String summary;
+  final List<SchoolScheduleItem> details;
+  ScheduleApprovalStatus status;
+}
+
+class SchoolAnnouncement {
+  const SchoolAnnouncement({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.dateLabel,
+    required this.author,
+    this.published = true,
+  });
+
+  final String id;
+  final String title;
+  final String body;
+  final String dateLabel;
+  final String author;
+  final bool published;
+}
+
 class WeekDay {
   const WeekDay({
     required this.key,
@@ -749,6 +844,334 @@ abstract final class DummyData {
     final total = attendance.fold<int>(0, (sum, item) => sum + item.value);
     if (total == 0) return 0;
     return attendance.first.value / total * 100;
+  }
+
+  // ——— Kepala Sekolah ———
+  static const kepsekName = 'Pak Hidayat Rahman';
+  static const kepsekRole = 'Kepala Sekolah';
+  static const kepsekInitials = 'HR';
+  static const kepsekEmail = 'hidayat.rahman@alanshar.sch.id';
+  static const kepsekPhone = '0812-7788-9900';
+
+  static const totalStudents = 312;
+  static const totalTeachers = 24;
+  static const totalClasses = 12;
+  static const studentPresencePercent = 94.0;
+  static const teacherPresencePercent = 97.0;
+
+  static const kepsekNotices = <AppNotice>[
+    AppNotice(
+      title: 'Jadwal semester genap menunggu persetujuan',
+      body: 'Hasil generate CSP dari Admin siap ditinjau.',
+      timeLabel: '07.05',
+      kind: NoticeKind.jadwal,
+    ),
+    AppNotice(
+      title: 'Kehadiran siswa di bawah 90%',
+      body: 'Kelas IV-B tercatat 88% hadir minggu ini.',
+      timeLabel: 'Kemarin',
+      kind: NoticeKind.absensi,
+    ),
+    AppNotice(
+      title: 'Rapat koordinasi kurikulum',
+      body: 'Rapat Senin pukul 13.00 di ruang kepala sekolah.',
+      timeLabel: '15 Nov',
+      kind: NoticeKind.sekolah,
+    ),
+    AppNotice(
+      title: 'Laporan PTS siap ditinjau',
+      body: 'Rekap nilai dan kehadiran PTS sudah diunggah Admin.',
+      timeLabel: '14 Nov',
+      kind: NoticeKind.akademik,
+      unread: false,
+    ),
+  ];
+
+  static int get kepsekUnreadCount =>
+      kepsekNotices.where((item) => item.unread).length;
+
+  static const schoolActivities = <AnnouncementItem>[
+    AnnouncementItem(
+      title: 'Apel pagi berjalan lancar',
+      body: '312 siswa hadir pada apel pagi hari ini.',
+      timeLabel: 'Hari ini · 07.00',
+      kind: NoticeKind.sekolah,
+    ),
+    AnnouncementItem(
+      title: 'Pengumpulan nilai PTS',
+      body: '18 dari 24 guru sudah mengunggah nilai PTS.',
+      timeLabel: 'Kemarin · 16.00',
+      kind: NoticeKind.akademik,
+    ),
+  ];
+
+  static const todaySchoolSchedule = <SchoolScheduleItem>[
+    SchoolScheduleItem(
+      start: '07.35',
+      end: '08.10',
+      subject: 'Matematika',
+      className: 'V-A',
+      teacher: 'Bu Ratna Sari',
+      room: 'Ruang 5A',
+    ),
+    SchoolScheduleItem(
+      start: '07.35',
+      end: '08.10',
+      subject: 'Bahasa Indonesia',
+      className: 'IV-B',
+      teacher: 'Bu Lestari Aminah',
+      room: 'Ruang 4B',
+    ),
+    SchoolScheduleItem(
+      start: '08.10',
+      end: '08.45',
+      subject: 'IPA',
+      className: 'VI-A',
+      teacher: 'Pak Hendra Wijaya',
+      room: 'Lab IPA',
+    ),
+    SchoolScheduleItem(
+      start: '09.00',
+      end: '09.35',
+      subject: 'Pendidikan Agama Islam',
+      className: 'V-A',
+      teacher: 'Pak Yusuf Hakim',
+      room: 'Ruang 5A',
+    ),
+  ];
+
+  static const weeklyPresenceChart = <ChartPoint>[
+    ChartPoint(label: 'Sen', value: 95),
+    ChartPoint(label: 'Sel', value: 93),
+    ChartPoint(label: 'Rab', value: 96),
+    ChartPoint(label: 'Kam', value: 92),
+    ChartPoint(label: 'Jum', value: 94),
+  ];
+
+  static const monthlyPresenceChart = <ChartPoint>[
+    ChartPoint(label: 'Jul', value: 91),
+    ChartPoint(label: 'Agu', value: 93),
+    ChartPoint(label: 'Sep', value: 94),
+    ChartPoint(label: 'Okt', value: 92),
+    ChartPoint(label: 'Nov', value: 94),
+  ];
+
+  static const classAttendanceStats = <ClassAttendanceStat>[
+    ClassAttendanceStat(className: 'I-A', presentPercent: 96, studentCount: 28),
+    ClassAttendanceStat(className: 'II-A', presentPercent: 95, studentCount: 27),
+    ClassAttendanceStat(className: 'III-A', presentPercent: 93, studentCount: 26),
+    ClassAttendanceStat(className: 'IV-A', presentPercent: 94, studentCount: 29),
+    ClassAttendanceStat(className: 'IV-B', presentPercent: 88, studentCount: 30),
+    ClassAttendanceStat(className: 'V-A', presentPercent: 91, studentCount: 32),
+    ClassAttendanceStat(className: 'VI-A', presentPercent: 97, studentCount: 28),
+  ];
+
+  static const teacherAttendanceStats = <TeacherAttendanceStat>[
+    TeacherAttendanceStat(
+      name: 'Bu Ratna Sari',
+      presentPercent: 98,
+      statusToday: AttendanceStatus.hadir,
+    ),
+    TeacherAttendanceStat(
+      name: 'Pak Hendra Wijaya',
+      presentPercent: 96,
+      statusToday: AttendanceStatus.hadir,
+    ),
+    TeacherAttendanceStat(
+      name: 'Bu Lestari Aminah',
+      presentPercent: 94,
+      statusToday: AttendanceStatus.izin,
+    ),
+    TeacherAttendanceStat(
+      name: 'Pak Yusuf Hakim',
+      presentPercent: 99,
+      statusToday: AttendanceStatus.hadir,
+    ),
+    TeacherAttendanceStat(
+      name: 'Bu Nadia Putri',
+      presentPercent: 95,
+      statusToday: AttendanceStatus.hadir,
+    ),
+  ];
+
+  static const schoolTeacherFilters = <String>[
+    'Semua guru',
+    'Bu Ratna Sari',
+    'Pak Hendra Wijaya',
+    'Bu Lestari Aminah',
+    'Pak Yusuf Hakim',
+  ];
+
+  static const schoolClassFilters = <String>[
+    'Semua kelas',
+    'IV-B',
+    'V-A',
+    'VI-A',
+  ];
+
+  static List<ScheduleApprovalItem> createScheduleApprovals() {
+    return [
+      ScheduleApprovalItem(
+        id: 'csp-1',
+        title: 'Generate Jadwal Semester Genap',
+        academicYear: '2026/2027',
+        semester: 'Semester Genap',
+        generatedAt: '14 Nov 2026 · 21.40',
+        classCount: 12,
+        teacherCount: 24,
+        summary:
+            'Penjadwalan otomatis selesai tanpa bentrok jam guru. 3 kelas mendapat penyesuaian ruangan.',
+        status: ScheduleApprovalStatus.menunggu,
+        details: const [
+          SchoolScheduleItem(
+            start: '07.35',
+            end: '08.10',
+            subject: 'Matematika',
+            className: 'V-A',
+            teacher: 'Bu Ratna Sari',
+            room: 'Ruang 5A',
+          ),
+          SchoolScheduleItem(
+            start: '08.10',
+            end: '08.45',
+            subject: 'IPA',
+            className: 'V-A',
+            teacher: 'Pak Hendra Wijaya',
+            room: 'Lab IPA',
+          ),
+          SchoolScheduleItem(
+            start: '07.35',
+            end: '08.10',
+            subject: 'Bahasa Indonesia',
+            className: 'IV-B',
+            teacher: 'Bu Lestari Aminah',
+            room: 'Ruang 4B',
+          ),
+          SchoolScheduleItem(
+            start: '09.00',
+            end: '09.35',
+            subject: 'Matematika',
+            className: 'VI-A',
+            teacher: 'Bu Ratna Sari',
+            room: 'Ruang 6A',
+          ),
+        ],
+      ),
+      ScheduleApprovalItem(
+        id: 'csp-2',
+        title: 'Revisi Jadwal Minggu Ujian',
+        academicYear: '2026/2027',
+        semester: 'Semester Ganjil',
+        generatedAt: '10 Nov 2026 · 18.15',
+        classCount: 12,
+        teacherCount: 24,
+        summary:
+            'Jadwal ujian tengah semester. Menunggu penyesuaian ruang aula.',
+        status: ScheduleApprovalStatus.revisi,
+        details: const [
+          SchoolScheduleItem(
+            start: '08.00',
+            end: '09.30',
+            subject: 'Ujian Matematika',
+            className: 'V-A',
+            teacher: 'Bu Ratna Sari',
+            room: 'Aula',
+          ),
+          SchoolScheduleItem(
+            start: '08.00',
+            end: '09.30',
+            subject: 'Ujian IPA',
+            className: 'VI-A',
+            teacher: 'Pak Hendra Wijaya',
+            room: 'Aula',
+          ),
+        ],
+      ),
+      ScheduleApprovalItem(
+        id: 'csp-3',
+        title: 'Jadwal Semester Ganjil',
+        academicYear: '2026/2027',
+        semester: 'Semester Ganjil',
+        generatedAt: '02 Jul 2026 · 09.20',
+        classCount: 12,
+        teacherCount: 24,
+        summary: 'Sudah disetujui dan dipublikasikan ke seluruh guru.',
+        status: ScheduleApprovalStatus.disetujui,
+        details: const [
+          SchoolScheduleItem(
+            start: '07.35',
+            end: '08.10',
+            subject: 'Matematika',
+            className: 'V-A',
+            teacher: 'Bu Ratna Sari',
+            room: 'Ruang 5A',
+          ),
+        ],
+      ),
+    ];
+  }
+
+  static final schoolAnnouncements = <SchoolAnnouncement>[
+    const SchoolAnnouncement(
+      id: 'a1',
+      title: 'Pembagian rapor PTS',
+      body:
+          'Pembagian rapor PTS dilaksanakan Sabtu, 21 November 2026 pukul 08.00 di aula sekolah. Orang tua diharapkan hadir.',
+      dateLabel: '15 Nov 2026',
+      author: 'Pak Hidayat Rahman',
+    ),
+    const SchoolAnnouncement(
+      id: 'a2',
+      title: 'Libur Maulid Nabi',
+      body:
+          'Kegiatan belajar mengajar diliburkan pada 15 September 2026 dalam rangka peringatan Maulid Nabi Muhammad SAW.',
+      dateLabel: '08 Sep 2026',
+      author: 'Pak Hidayat Rahman',
+    ),
+    const SchoolAnnouncement(
+      id: 'a3',
+      title: 'Draft: Latihan manasik haji',
+      body:
+          'Rencana kegiatan manasik haji untuk kelas VI. Belum dipublikasikan.',
+      dateLabel: '16 Nov 2026',
+      author: 'Pak Hidayat Rahman',
+      published: false,
+    ),
+  ];
+}
+
+extension ScheduleApprovalStatusStyle on ScheduleApprovalStatus {
+  String get label {
+    switch (this) {
+      case ScheduleApprovalStatus.menunggu:
+        return 'Menunggu Persetujuan';
+      case ScheduleApprovalStatus.disetujui:
+        return 'Disetujui';
+      case ScheduleApprovalStatus.revisi:
+        return 'Perlu Revisi';
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case ScheduleApprovalStatus.menunggu:
+        return AppColors.warningInk;
+      case ScheduleApprovalStatus.disetujui:
+        return AppColors.success;
+      case ScheduleApprovalStatus.revisi:
+        return AppColors.danger;
+    }
+  }
+
+  Color get background {
+    switch (this) {
+      case ScheduleApprovalStatus.menunggu:
+        return AppColors.warningSoft;
+      case ScheduleApprovalStatus.disetujui:
+        return AppColors.successSoft;
+      case ScheduleApprovalStatus.revisi:
+        return AppColors.dangerSoft;
+    }
   }
 }
 
