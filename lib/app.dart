@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'core/storage/memory_session_storage.dart';
+import 'core/storage/secure_session_storage.dart';
 import 'core/storage/session_storage.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/guru_repository.dart';
@@ -45,7 +45,7 @@ class _LmsAppState extends State<LmsApp> {
   void initState() {
     super.initState();
     final repository = widget.authRepository ?? MockAuthRepository();
-    final storage = widget.sessionStorage ?? MemorySessionStorage();
+    final storage = widget.sessionStorage ?? SecureSessionStorage();
     _session = SessionController(
       authService: AuthService(
         repository: repository,

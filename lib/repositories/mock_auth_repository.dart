@@ -1,5 +1,9 @@
+import 'dart:math';
+
 import '../core/config/app_config.dart';
 import '../core/errors/auth_exception.dart';
+import '../core/security/password_hasher.dart';
+import '../core/security/secure_token.dart';
 import '../models/app_role.dart';
 import '../models/auth_session.dart';
 import '../models/user_account.dart';
@@ -8,16 +12,17 @@ import 'auth_repository.dart';
 class _DemoAccount {
   const _DemoAccount({
     required this.username,
-    required this.password,
+    required this.passwordHash,
     required this.user,
   });
 
   final String username;
-  final String password;
+  final String passwordHash;
   final UserAccount user;
 }
 
 /// Autentikasi mock untuk pengembangan tanpa backend.
+/// Password disimpan sebagai hash (SHA-256 + pepper), bukan plaintext.
 /// Ganti ke implementasi API tanpa mengubah layar login.
 class MockAuthRepository implements AuthRepository {
   MockAuthRepository({
@@ -26,10 +31,13 @@ class MockAuthRepository implements AuthRepository {
 
   final Duration networkDelay;
 
+  /// Hash pra-komputasi: PasswordHasher.hash(password, username).
+  /// Password plaintext tidak ada di sumber kode akun.
   static const List<_DemoAccount> _accounts = [
     _DemoAccount(
       username: 'ratna@alanshar.sch.id',
-      password: 'demo',
+      passwordHash:
+          'ba180b55b71f673137480c03333fbf5f2cf2cc3f9d754eac4ef4066c21a8ab92',
       user: UserAccount(
         id: 'usr-guru-001',
         name: 'Bu Ratna Sari',
@@ -42,7 +50,8 @@ class MockAuthRepository implements AuthRepository {
     ),
     _DemoAccount(
       username: 'guru@alanshar.sch.id',
-      password: 'guru123',
+      passwordHash:
+          '301d096808ddbb292c28c37a1b37ab61fdd13f58b90a398e97c5966be7ea291c',
       user: UserAccount(
         id: 'usr-guru-001',
         name: 'Bu Ratna Sari',
@@ -55,7 +64,8 @@ class MockAuthRepository implements AuthRepository {
     ),
     _DemoAccount(
       username: 'ortu@alanshar.sch.id',
-      password: 'demo',
+      passwordHash:
+          '6e02de0b38f235118cb1c42a29ba1d4278ce3558de2a32aa070e7469841401df',
       user: UserAccount(
         id: 'usr-ortu-001',
         name: 'Ibu Siti Ramadhani',
@@ -68,7 +78,8 @@ class MockAuthRepository implements AuthRepository {
     ),
     _DemoAccount(
       username: 'kepsek@alanshar.sch.id',
-      password: 'demo',
+      passwordHash:
+          'ff560fb57b7b52682a1bbee7dcd879bedf840967b0c8c1f7cfb40f4223227ea2',
       user: UserAccount(
         id: 'usr-kepsek-001',
         name: 'Pak Hidayat Rahman',
@@ -81,10 +92,28 @@ class MockAuthRepository implements AuthRepository {
     ),
   ];
 
-  /// Akun demo yang ditampilkan sebagai bantuan di UI login.
-  static ({String username, String password}) demoCredentialsFor(AppRole role) {
+  /// Username demo untuk hint UI (password tidak diisi otomatis).
+  static String demoUsernameFor(AppRole role) {
     final account = _accounts.firstWhere((item) => item.user.role == role);
-    return (username: account.username, password: account.password);
+    return account.username;
+  }
+
+  /// Prefill password demo hanya jika diizinkan (default off).
+  static String? demoPasswordHintFor(AppRole role) {
+    if (!AppConfig.allowDemoPasswordPrefill) return null;
+    return switch (role) {
+      AppRole.guru => 'demo',
+      AppRole.orangTua => 'demo',
+      AppRole.kepalaSekolah => 'demo',
+    };
+  }
+
+  @Deprecated('Gunakan demoUsernameFor + input password manual')
+  static ({String username, String password}) demoCredentialsFor(AppRole role) {
+    return (
+      username: demoUsernameFor(role),
+      password: demoPasswordHintFor(role) ?? '',
+    );
   }
 
   static List<({AppRole role, String username})> get demoDirectory {
@@ -120,13 +149,22 @@ class MockAuthRepository implements AuthRepository {
       );
     }
 
+    // Jitter kecil agar timing response tidak mudah membedakan user ada/tidak.
+    await Future<void>.delayed(
+      Duration(milliseconds: 40 + Random.secure().nextInt(80)),
+    );
+
     _DemoAccount? matched;
     for (final account in _accounts) {
-      if (account.username.toLowerCase() == normalized &&
-          account.password == password) {
+      if (account.username.toLowerCase() != normalized) continue;
+      if (PasswordHasher.verify(
+        password: password,
+        username: account.username,
+        expectedHash: account.passwordHash,
+      )) {
         matched = account;
-        break;
       }
+      break;
     }
 
     if (matched == null) {
@@ -137,10 +175,12 @@ class MockAuthRepository implements AuthRepository {
     }
 
     final now = DateTime.now();
+    final access = SecureToken.generate();
+    final refresh = SecureToken.generate(byteLength: 24);
     return AuthSession(
-      accessToken: 'mock-access-${matched.user.id}-${now.millisecondsSinceEpoch}',
-      refreshToken: 'mock-refresh-${matched.user.id}',
-      expiresAt: now.add(const Duration(hours: 8)),
+      accessToken: 'mock.$access',
+      refreshToken: 'mock.$refresh',
+      expiresAt: now.add(AppConfig.sessionTtl),
       user: matched.user,
     );
   }
@@ -163,7 +203,8 @@ class MockAuthRepository implements AuthRepository {
           : Duration.zero,
     );
     if (session.isExpired) return null;
-    if (!session.accessToken.startsWith('mock-access-')) return null;
+    if (!session.accessToken.startsWith('mock.')) return null;
+    if (session.accessToken.length < 20) return null;
     return session;
   }
 }

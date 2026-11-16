@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/errors/auth_exception.dart';
 import '../../repositories/mock_auth_repository.dart';
 import '../../state/session_controller.dart';
@@ -41,11 +42,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _applyRoleHint(AppRole role) {
-    final demo = MockAuthRepository.demoCredentialsFor(role);
+    final username = MockAuthRepository.demoUsernameFor(role);
+    final demoPassword = MockAuthRepository.demoPasswordHintFor(role);
     setState(() {
       _roleHint = role;
-      _email.text = demo.username;
-      _password.text = demo.password;
+      _email.text = username;
+      // Password tidak diisi otomatis kecuali flag demo eksplisit.
+      _password.text = demoPassword ?? '';
       _error = null;
     });
   }
@@ -276,7 +279,7 @@ class _LoginCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Akun demo',
+            'Pilih akun demo (username saja)',
             style: AppText.style(
               size: 13,
               weight: FontWeight.w600,
@@ -320,7 +323,9 @@ class _LoginCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Admin tetap menggunakan website desktop.',
+            AppConfig.allowDemoPasswordPrefill
+                ? 'Mode demo: password ikut terisi. Admin memakai website.'
+                : 'Password harus diketik manual. Admin memakai website.',
             style: AppText.style(size: 11.5, color: AppColors.muted),
           ),
           const SizedBox(height: 12),
@@ -331,6 +336,8 @@ class _LoginCard extends StatelessWidget {
             icon: Icons.mail_outline_rounded,
             textInputAction: TextInputAction.next,
             enabled: !loading,
+            keyboardType: TextInputType.emailAddress,
+            autofillHints: const [AutofillHints.username],
           ),
           const SizedBox(height: 12),
           _Field(
@@ -342,6 +349,9 @@ class _LoginCard extends StatelessWidget {
             textInputAction: TextInputAction.done,
             enabled: !loading,
             onSubmitted: onSubmit,
+            autocorrect: false,
+            enableSuggestions: false,
+            autofillHints: const [AutofillHints.password],
             trailing: IconButton(
               tooltip: obscure ? 'Tampilkan password' : 'Sembunyikan password',
               onPressed: loading ? null : onToggleObscure,
@@ -441,7 +451,7 @@ class _LoginCard extends StatelessWidget {
           const SizedBox(height: 12),
           Center(
             child: Text(
-              'Mock auth · password tidak disimpan',
+              'Sesi terenkripsi · password tidak disimpan',
               style: AppText.style(size: 11.5, color: AppColors.muted),
             ),
           ),
@@ -514,6 +524,10 @@ class _Field extends StatelessWidget {
     this.textInputAction,
     this.onSubmitted,
     this.enabled = true,
+    this.keyboardType,
+    this.autocorrect = true,
+    this.enableSuggestions = true,
+    this.autofillHints,
   });
 
   final String label;
@@ -525,6 +539,10 @@ class _Field extends StatelessWidget {
   final TextInputAction? textInputAction;
   final VoidCallback? onSubmitted;
   final bool enabled;
+  final TextInputType? keyboardType;
+  final bool autocorrect;
+  final bool enableSuggestions;
+  final Iterable<String>? autofillHints;
 
   @override
   Widget build(BuildContext context) {
@@ -544,6 +562,10 @@ class _Field extends StatelessWidget {
           controller: controller,
           enabled: enabled,
           obscureText: obscure,
+          autocorrect: autocorrect,
+          enableSuggestions: enableSuggestions,
+          keyboardType: keyboardType,
+          autofillHints: autofillHints,
           textInputAction: textInputAction,
           onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
           style: AppText.style(size: 14, weight: FontWeight.w500),

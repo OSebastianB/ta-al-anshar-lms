@@ -58,7 +58,20 @@ al_anshar_lms/
 | Orang Tua | `ortu@alanshar.sch.id` | `demo` |
 | Kepala Sekolah | `kepsek@alanshar.sch.id` | `demo` |
 
-Chip role di login hanya mengisi akun demo. Role aktual mengikuti hasil autentikasi.
+Chip role di login hanya mengisi **username**. Password diketik manual (lebih aman). Prefill password demo hanya jika build memakai `--dart-define=ALLOW_DEMO_PASSWORD_PREFILL=true`. Role aktual mengikuti hasil autentikasi.
+
+## Keamanan (client hardening)
+
+Mitigasi yang sudah diterapkan di aplikasi:
+
+- Password mock disimpan sebagai **hash** (bukan plaintext di source akun)
+- Sesi & username "ingat saya" di **FlutterSecureStorage** (bukan SharedPreferences biasa)
+- Token sesi acak (`Random.secure`), TTL 8 jam, ditolak jika kedaluwarsa
+- **Login lockout** lokal setelah 5 gagal (1 menit)
+- UI login tidak mengisi password otomatis (default)
+- Android: `FLAG_SECURE`, `allowBackup=false`, cleartext HTTP off, minify/shrink release
+
+Catatan penting: aplikasi klien **tidak bisa “tidak bisa di-hack” sepenuhnya** tanpa backend. Proteksi final (hash server, JWT, rate-limit, otorisasi role, HTTPS sertifikat, audit log) wajib ada di API.
 
 ## Menjalankan aplikasi
 
