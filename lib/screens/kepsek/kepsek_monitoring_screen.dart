@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../data/dummy_data.dart';
+import '../../state/kepsek_controller.dart';
+import '../../state/session_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/attendance_status_chip.dart';
@@ -17,14 +18,18 @@ class KepsekMonitoringScreen extends StatefulWidget {
 class _KepsekMonitoringScreenState extends State<KepsekMonitoringScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
-  String _month = DummyData.monthFilters.first;
-  String _classFilter = DummyData.schoolClassFilters.first;
-  String _teacherFilter = DummyData.schoolTeacherFilters.first;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final kepsek = KepsekScope.of(context);
+      final userId = SessionScope.of(context).user?.id;
+      if (userId != null) kepsek.bindKepsek(userId);
+      kepsek.loadAttendanceMonitoring();
+      kepsek.loadScheduleMonitoring();
+    });
   }
 
   @override
@@ -54,18 +59,9 @@ class _KepsekMonitoringScreenState extends State<KepsekMonitoringScreen>
         Expanded(
           child: TabBarView(
             controller: _tabs,
-            children: [
-              _AttendanceTab(
-                month: _month,
-                onMonthChanged: (value) => setState(() => _month = value),
-              ),
-              _ScheduleTab(
-                classFilter: _classFilter,
-                teacherFilter: _teacherFilter,
-                onClassChanged: (value) => setState(() => _classFilter = value),
-                onTeacherChanged: (value) =>
-                    setState(() => _teacherFilter = value),
-              ),
+            children: const [
+              _AttendanceTab(),
+              _ScheduleTab(),
             ],
           ),
         ),
@@ -75,25 +71,61 @@ class _KepsekMonitoringScreenState extends State<KepsekMonitoringScreen>
 }
 
 class _AttendanceTab extends StatelessWidget {
-  const _AttendanceTab({
-    required this.month,
-    required this.onMonthChanged,
-  });
-
-  final String month;
-  final ValueChanged<String> onMonthChanged;
+  const _AttendanceTab();
 
   @override
   Widget build(BuildContext context) {
+    final kepsek = KepsekScope.of(context);
+    final data = kepsek.attendanceMonitoring;
+
+    if (kepsek.attendanceState == LoadState.loading ||
+        kepsek.attendanceState == LoadState.idle) {
+      return Center(
+        child: Text(
+          'Memuat monitoring kehadiran...',
+          style: AppText.style(size: 13.5, color: AppColors.muted),
+        ),
+      );
+    }
+
+    if (kepsek.attendanceState == LoadState.error || data == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                kepsek.attendanceError ?? 'Gagal memuat data.',
+                textAlign: TextAlign.center,
+                style: AppText.style(size: 14, color: AppColors.muted),
+              ),
+              TextButton(
+                onPressed: () => kepsek.loadAttendanceMonitoring(),
+                child: Text(
+                  'Coba lagi',
+                  style: AppText.style(
+                    size: 13.5,
+                    weight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
         _FilterDropdown(
           label: 'Filter bulan',
-          value: month,
-          options: DummyData.monthFilters,
-          onChanged: onMonthChanged,
+          value: data.selectedMonth,
+          options: data.monthOptions,
+          onChanged: (value) => kepsek.loadAttendanceMonitoring(month: value),
         ),
         const SizedBox(height: 12),
         Row(
@@ -101,7 +133,7 @@ class _AttendanceTab extends StatelessWidget {
             Expanded(
               child: _StatBox(
                 label: 'Siswa',
-                value: '${DummyData.studentPresencePercent.toStringAsFixed(0)}%',
+                value: '${data.studentPresencePercent.toStringAsFixed(0)}%',
                 hint: 'Kehadiran sekolah',
                 color: AppColors.success,
                 background: AppColors.successSoft,
@@ -111,7 +143,7 @@ class _AttendanceTab extends StatelessWidget {
             Expanded(
               child: _StatBox(
                 label: 'Guru',
-                value: '${DummyData.teacherPresencePercent.toStringAsFixed(0)}%',
+                value: '${data.teacherPresencePercent.toStringAsFixed(0)}%',
                 hint: 'Kehadiran pegawai',
                 color: AppColors.accent,
                 background: AppColors.accentSoft,
@@ -129,7 +161,7 @@ class _AttendanceTab extends StatelessWidget {
             borderRadius: BorderRadius.circular(13),
             border: Border.all(color: AppColors.border),
           ),
-          child: const SimpleBarChart(points: DummyData.weeklyPresenceChart),
+          child: SimpleBarChart(points: data.weeklyChart),
         ),
         const SizedBox(height: 16),
         const SectionHeader(title: 'Grafik kehadiran bulanan'),
@@ -141,15 +173,15 @@ class _AttendanceTab extends StatelessWidget {
             borderRadius: BorderRadius.circular(13),
             border: Border.all(color: AppColors.border),
           ),
-          child: const SimpleBarChart(
-            points: DummyData.monthlyPresenceChart,
+          child: SimpleBarChart(
+            points: data.monthlyChart,
             barColor: AppColors.navyMid,
           ),
         ),
         const SizedBox(height: 16),
         const SectionHeader(title: 'Rekap kehadiran per kelas'),
         const SizedBox(height: 10),
-        for (final item in DummyData.classAttendanceStats) ...[
+        for (final item in data.classStats) ...[
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -196,7 +228,7 @@ class _AttendanceTab extends StatelessWidget {
         const SizedBox(height: 8),
         const SectionHeader(title: 'Kehadiran guru hari ini'),
         const SizedBox(height: 10),
-        for (final item in DummyData.teacherAttendanceStats) ...[
+        for (final item in data.teacherStats) ...[
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -237,27 +269,51 @@ class _AttendanceTab extends StatelessWidget {
 }
 
 class _ScheduleTab extends StatelessWidget {
-  const _ScheduleTab({
-    required this.classFilter,
-    required this.teacherFilter,
-    required this.onClassChanged,
-    required this.onTeacherChanged,
-  });
-
-  final String classFilter;
-  final String teacherFilter;
-  final ValueChanged<String> onClassChanged;
-  final ValueChanged<String> onTeacherChanged;
+  const _ScheduleTab();
 
   @override
   Widget build(BuildContext context) {
-    final items = DummyData.todaySchoolSchedule.where((item) {
-      final classOk =
-          classFilter == 'Semua kelas' || item.className == classFilter;
-      final teacherOk =
-          teacherFilter == 'Semua guru' || item.teacher == teacherFilter;
-      return classOk && teacherOk;
-    }).toList();
+    final kepsek = KepsekScope.of(context);
+    final data = kepsek.scheduleMonitoring;
+
+    if (kepsek.scheduleState == LoadState.loading ||
+        kepsek.scheduleState == LoadState.idle) {
+      return Center(
+        child: Text(
+          'Memuat monitoring jadwal...',
+          style: AppText.style(size: 13.5, color: AppColors.muted),
+        ),
+      );
+    }
+
+    if (kepsek.scheduleState == LoadState.error || data == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                kepsek.scheduleError ?? 'Gagal memuat jadwal.',
+                textAlign: TextAlign.center,
+                style: AppText.style(size: 14, color: AppColors.muted),
+              ),
+              TextButton(
+                onPressed: () => kepsek.loadScheduleMonitoring(),
+                child: Text(
+                  'Coba lagi',
+                  style: AppText.style(
+                    size: 13.5,
+                    weight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return ListView(
       physics: const ClampingScrollPhysics(),
@@ -268,25 +324,31 @@ class _ScheduleTab extends StatelessWidget {
             Expanded(
               child: _FilterDropdown(
                 label: 'Kelas',
-                value: classFilter,
-                options: DummyData.schoolClassFilters,
-                onChanged: onClassChanged,
+                value: data.selectedClass,
+                options: data.classFilters,
+                onChanged: (value) => kepsek.loadScheduleMonitoring(
+                  classFilter: value,
+                  teacherFilter: data.selectedTeacher,
+                ),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _FilterDropdown(
                 label: 'Guru',
-                value: teacherFilter,
-                options: DummyData.schoolTeacherFilters,
-                onChanged: onTeacherChanged,
+                value: data.selectedTeacher,
+                options: data.teacherFilters,
+                onChanged: (value) => kepsek.loadScheduleMonitoring(
+                  classFilter: data.selectedClass,
+                  teacherFilter: value,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 14),
         Text(
-          'Jadwal hari ini · ${DummyData.demoDateLabel}',
+          'Jadwal hari ini · ${data.dateLabel}',
           style: AppText.style(
             size: 14,
             weight: FontWeight.w700,
@@ -294,7 +356,7 @@ class _ScheduleTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        if (items.isEmpty)
+        if (data.items.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -309,7 +371,7 @@ class _ScheduleTab extends StatelessWidget {
             ),
           )
         else
-          for (final item in items) ...[
+          for (final item in data.items) ...[
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -344,7 +406,7 @@ class _ScheduleTab extends StatelessWidget {
           ],
         const SizedBox(height: 8),
         Text(
-          'Tampilan mingguan mengikuti filter kelas dan guru di atas.',
+          'Monitoring jadwal pembelajaran. Generate jadwal otomatis tidak tersedia di mobile.',
           style: AppText.style(size: 12, color: AppColors.muted),
         ),
       ],

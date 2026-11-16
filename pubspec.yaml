@@ -1,5 +1,5 @@
 name: al_anshar_lms
-description: "Mockup UI mobile LMS SD Islam Al-Anshar Kota Bekasi."
+description: "Aplikasi LMS Android SD Islam Al-Anshar Kota Bekasi (Flutter)."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

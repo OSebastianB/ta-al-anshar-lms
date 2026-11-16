@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/errors/auth_exception.dart';
+import '../../repositories/mock_auth_repository.dart';
 import '../../state/session_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
@@ -14,10 +16,39 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
-  AppRole _role = AppRole.guru;
+  AppRole _roleHint = AppRole.guru;
   bool _obscure = true;
   bool _remember = true;
   String? _error;
+  bool _prefilled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_prefilled) return;
+    _prefilled = true;
+    _loadRemembered();
+  }
+
+  Future<void> _loadRemembered() async {
+    final remembered = await SessionScope.of(context).rememberedUsername();
+    if (!mounted) return;
+    if (remembered != null && remembered.isNotEmpty) {
+      _email.text = remembered;
+      return;
+    }
+    _applyRoleHint(AppRole.guru);
+  }
+
+  void _applyRoleHint(AppRole role) {
+    final demo = MockAuthRepository.demoCredentialsFor(role);
+    setState(() {
+      _roleHint = role;
+      _email.text = demo.username;
+      _password.text = demo.password;
+      _error = null;
+    });
+  }
 
   @override
   void dispose() {
@@ -26,20 +57,43 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    final email = _email.text.trim();
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+    final username = _email.text.trim();
     final password = _password.text;
-    if (email.isEmpty || password.isEmpty) {
-      setState(() {
-        _error = 'Isi username dan password untuk masuk ke simulasi.';
-      });
+
+    if (username.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Username dan password wajib diisi.');
       return;
     }
-    SessionScope.of(context).login(_role);
+    if (password.length < 4) {
+      setState(() => _error = 'Password minimal 4 karakter.');
+      return;
+    }
+
+    final session = SessionScope.of(context);
+    setState(() => _error = null);
+
+    try {
+      await session.login(
+        username: username,
+        password: password,
+        rememberMe: _remember,
+      );
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Gagal masuk. Silakan coba lagi.');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final session = SessionScope.of(context);
+    final loading = session.isAuthenticating;
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Stack(
@@ -73,14 +127,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       _LoginCard(
                         email: _email,
                         password: _password,
-                        role: _role,
+                        roleHint: _roleHint,
                         obscure: _obscure,
                         remember: _remember,
                         error: _error,
-                        onRole: (role) => setState(() => _role = role),
-                        onToggleObscure: () => setState(() => _obscure = !_obscure),
-                        onRemember: (value) => setState(() => _remember = value),
-                        onSubmit: _submit,
+                        loading: loading,
+                        onRoleHint: loading ? null : _applyRoleHint,
+                        onToggleObscure: () =>
+                            setState(() => _obscure = !_obscure),
+                        onRemember: (value) =>
+                            setState(() => _remember = value),
+                        onSubmit: loading ? null : _submit,
                       ),
                     ],
                   ),
@@ -159,11 +216,12 @@ class _LoginCard extends StatelessWidget {
   const _LoginCard({
     required this.email,
     required this.password,
-    required this.role,
+    required this.roleHint,
     required this.obscure,
     required this.remember,
     required this.error,
-    required this.onRole,
+    required this.loading,
+    required this.onRoleHint,
     required this.onToggleObscure,
     required this.onRemember,
     required this.onSubmit,
@@ -171,14 +229,15 @@ class _LoginCard extends StatelessWidget {
 
   final TextEditingController email;
   final TextEditingController password;
-  final AppRole role;
+  final AppRole roleHint;
   final bool obscure;
   final bool remember;
   final String? error;
-  final ValueChanged<AppRole> onRole;
+  final bool loading;
+  final ValueChanged<AppRole>? onRoleHint;
   final VoidCallback onToggleObscure;
   final ValueChanged<bool> onRemember;
-  final VoidCallback onSubmit;
+  final VoidCallback? onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -211,12 +270,13 @@ class _LoginCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Selamat datang. Pilih role untuk melihat simulasi tampilan mobile.',
+            'Masuk dengan akun Guru, Orang Tua, atau Kepala Sekolah. '
+            'Role ditentukan dari akun yang berhasil diautentikasi.',
             style: AppText.style(size: 13.5, color: AppColors.muted, height: 1.4),
           ),
           const SizedBox(height: 12),
           Text(
-            'Simulasi role',
+            'Akun demo',
             style: AppText.style(
               size: 13,
               weight: FontWeight.w600,
@@ -230,8 +290,10 @@ class _LoginCard extends StatelessWidget {
                 child: _RoleOption(
                   label: 'Guru',
                   icon: Icons.school_outlined,
-                  selected: role == AppRole.guru,
-                  onTap: () => onRole(AppRole.guru),
+                  selected: roleHint == AppRole.guru,
+                  onTap: onRoleHint == null
+                      ? null
+                      : () => onRoleHint!(AppRole.guru),
                 ),
               ),
               const SizedBox(width: 8),
@@ -239,8 +301,10 @@ class _LoginCard extends StatelessWidget {
                 child: _RoleOption(
                   label: 'Orang Tua',
                   icon: Icons.family_restroom_outlined,
-                  selected: role == AppRole.orangTua,
-                  onTap: () => onRole(AppRole.orangTua),
+                  selected: roleHint == AppRole.orangTua,
+                  onTap: onRoleHint == null
+                      ? null
+                      : () => onRoleHint!(AppRole.orangTua),
                 ),
               ),
             ],
@@ -249,8 +313,10 @@ class _LoginCard extends StatelessWidget {
           _RoleOption(
             label: 'Kepala Sekolah',
             icon: Icons.apartment_outlined,
-            selected: role == AppRole.kepalaSekolah,
-            onTap: () => onRole(AppRole.kepalaSekolah),
+            selected: roleHint == AppRole.kepalaSekolah,
+            onTap: onRoleHint == null
+                ? null
+                : () => onRoleHint!(AppRole.kepalaSekolah),
           ),
           const SizedBox(height: 6),
           Text(
@@ -264,6 +330,7 @@ class _LoginCard extends StatelessWidget {
             hint: 'nama@alanshar.sch.id',
             icon: Icons.mail_outline_rounded,
             textInputAction: TextInputAction.next,
+            enabled: !loading,
           ),
           const SizedBox(height: 12),
           _Field(
@@ -273,12 +340,15 @@ class _LoginCard extends StatelessWidget {
             icon: Icons.lock_outline_rounded,
             obscure: obscure,
             textInputAction: TextInputAction.done,
+            enabled: !loading,
             onSubmitted: onSubmit,
             trailing: IconButton(
               tooltip: obscure ? 'Tampilkan password' : 'Sembunyikan password',
-              onPressed: onToggleObscure,
+              onPressed: loading ? null : onToggleObscure,
               icon: Icon(
-                obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                obscure
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 size: 18,
                 color: AppColors.muted,
               ),
@@ -292,7 +362,9 @@ class _LoginCard extends StatelessWidget {
                 height: 22,
                 child: Checkbox(
                   value: remember,
-                  onChanged: (value) => onRemember(value ?? false),
+                  onChanged: loading
+                      ? null
+                      : (value) => onRemember(value ?? false),
                   activeColor: AppColors.accent,
                   side: const BorderSide(color: AppColors.borderStrong),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -330,30 +402,46 @@ class _LoginCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             height: 48,
-            child: FilledButton.icon(
+            child: FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.6),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
               onPressed: onSubmit,
-              icon: const Icon(Icons.login_rounded, size: 18),
-              label: Text(
-                'Login',
-                style: AppText.style(
-                  size: 15,
-                  weight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
+              child: loading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.login_rounded, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Login',
+                          style: AppText.style(
+                            size: 15,
+                            weight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           const SizedBox(height: 12),
           Center(
             child: Text(
-              'Mode demo · data tidak disimpan',
+              'Mock auth · password tidak disimpan',
               style: AppText.style(size: 11.5, color: AppColors.muted),
             ),
           ),
@@ -374,7 +462,7 @@ class _RoleOption extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -425,6 +513,7 @@ class _Field extends StatelessWidget {
     this.trailing,
     this.textInputAction,
     this.onSubmitted,
+    this.enabled = true,
   });
 
   final String label;
@@ -435,6 +524,7 @@ class _Field extends StatelessWidget {
   final Widget? trailing;
   final TextInputAction? textInputAction;
   final VoidCallback? onSubmitted;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -452,6 +542,7 @@ class _Field extends StatelessWidget {
         const SizedBox(height: 6),
         TextField(
           controller: controller,
+          enabled: enabled,
           obscureText: obscure,
           textInputAction: textInputAction,
           onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
@@ -470,9 +561,16 @@ class _Field extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.border),
             ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFB7CCEB), width: 1.4),
+              borderSide: const BorderSide(
+                color: Color(0xFFB7CCEB),
+                width: 1.4,
+              ),
             ),
           ),
         ),

@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../data/dummy_data.dart';
+import '../models/models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
@@ -95,8 +95,15 @@ class SummaryCard extends StatelessWidget {
 }
 
 class AttendanceSummaryCard extends StatelessWidget {
-  const AttendanceSummaryCard({super.key, this.onTap});
+  const AttendanceSummaryCard({
+    super.key,
+    required this.slices,
+    required this.hint,
+    this.onTap,
+  });
 
+  final List<AttendanceSlice> slices;
+  final String hint;
   final VoidCallback? onTap;
 
   @override
@@ -146,7 +153,7 @@ class AttendanceSummaryCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'Kelas V-A · 32 siswa · 91% hadir',
+                            hint,
                             style: AppText.style(
                               size: 12,
                               color: AppColors.muted,
@@ -164,9 +171,9 @@ class AttendanceSummaryCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    for (var i = 0; i < DummyData.attendance.length; i++) ...[
+                    for (var i = 0; i < slices.length; i++) ...[
                       if (i > 0) const SizedBox(width: 8),
-                      Expanded(child: _Slice(item: DummyData.attendance[i])),
+                      Expanded(child: _Slice(item: slices[i])),
                     ],
                   ],
                 ),

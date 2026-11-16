@@ -1,16 +1,18 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../data/dummy_data.dart';
+import '../models/models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
 class DaySelector extends StatelessWidget {
   const DaySelector({
     super.key,
+    required this.days,
     required this.selectedKey,
     required this.onSelected,
   });
 
+  final List<WeekDay> days;
   final String selectedKey;
   final ValueChanged<String> onSelected;
 
@@ -20,10 +22,10 @@ class DaySelector extends StatelessWidget {
       height: 72,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: DummyData.weekDays.length,
+        itemCount: days.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
-          final day = DummyData.weekDays[index];
+          final day = days[index];
           final selected = day.key == selectedKey;
           return Material(
             color: selected ? AppColors.accent : AppColors.card,

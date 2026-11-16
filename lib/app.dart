@@ -1,22 +1,59 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'core/storage/memory_session_storage.dart';
+import 'core/storage/session_storage.dart';
+import 'repositories/auth_repository.dart';
+import 'repositories/guru_repository.dart';
+import 'repositories/kepsek_repository.dart';
+import 'repositories/mock_auth_repository.dart';
+import 'repositories/parent_repository.dart';
 import 'screens/guru/guru_shell.dart';
 import 'screens/kepsek/kepsek_shell.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/orangtua/orangtua_shell.dart';
+import 'services/auth_service.dart';
 import 'state/session_controller.dart';
+import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'widgets/lms_bottom_nav.dart';
 
 class LmsApp extends StatefulWidget {
-  const LmsApp({super.key});
+  const LmsApp({
+    super.key,
+    this.authRepository,
+    this.sessionStorage,
+    this.guruRepository,
+    this.parentRepository,
+    this.kepsekRepository,
+  });
+
+  /// Override untuk tes atau implementasi API nanti.
+  final AuthRepository? authRepository;
+  final SessionStorage? sessionStorage;
+  final GuruRepository? guruRepository;
+  final ParentRepository? parentRepository;
+  final KepsekRepository? kepsekRepository;
 
   @override
   State<LmsApp> createState() => _LmsAppState();
 }
 
 class _LmsAppState extends State<LmsApp> {
-  final _session = SessionController();
+  late final SessionController _session;
+
+  @override
+  void initState() {
+    super.initState();
+    final repository = widget.authRepository ?? MockAuthRepository();
+    final storage = widget.sessionStorage ?? MemorySessionStorage();
+    _session = SessionController(
+      authService: AuthService(
+        repository: repository,
+        sessionStorage: storage,
+      ),
+    );
+    _session.bootstrap();
+  }
 
   @override
   void dispose() {
@@ -28,28 +65,50 @@ class _LmsAppState extends State<LmsApp> {
   Widget build(BuildContext context) {
     return SessionScope(
       controller: _session,
-      child: AnimatedBuilder(
-        animation: _session,
-        builder: (context, _) {
-          final role = _session.role;
-          return MaterialApp(
-            title: 'LMS Al-Anshar',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.light().copyWith(
-              navigationBarTheme: lmsNavigationTheme(),
-            ),
-            locale: const Locale('id'),
-            supportedLocales: const [Locale('id'), Locale('en')],
-            localizationsDelegates: GlobalMaterialLocalizations.delegates,
-            home: switch (role) {
-              null => const LoginScreen(),
-              AppRole.guru => const GuruShell(),
-              AppRole.orangTua => const OrangtuaShell(),
-              AppRole.kepalaSekolah => const KepsekShell(),
-            },
-          );
-        },
+      child: MaterialApp(
+        title: 'LMS Al-Anshar',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light().copyWith(
+          navigationBarTheme: lmsNavigationTheme(),
+        ),
+        locale: const Locale('id'),
+        supportedLocales: const [Locale('id'), Locale('en')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        home: const _AuthGate(),
       ),
     );
+  }
+}
+
+/// Gate navigasi berbasis sesi/role. MaterialApp tidak di-recreate saat tab berubah.
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final session = SessionScope.of(context);
+
+    if (session.isRestoring) {
+      return const Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.accent),
+        ),
+      );
+    }
+
+    final role = session.role;
+    if (role == null || !session.isLoggedIn) {
+      return const LoginScreen();
+    }
+
+    final app = context.findAncestorWidgetOfExactType<LmsApp>();
+    return switch (role) {
+      AppRole.guru => GuruShell(guruRepository: app?.guruRepository),
+      AppRole.orangTua =>
+          OrangtuaShell(parentRepository: app?.parentRepository),
+      AppRole.kepalaSekolah =>
+          KepsekShell(kepsekRepository: app?.kepsekRepository),
+    };
   }
 }

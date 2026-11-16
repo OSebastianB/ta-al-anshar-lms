@@ -13,29 +13,31 @@ class GuruProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
+    final user = session.user;
 
     return ListView(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        const ProfileHeader(
-          name: DummyData.guruName,
-          role: '${DummyData.guruRole} · ${DummyData.guruHomeroom}',
-          initials: DummyData.guruInitials,
+        ProfileHeader(
+          name: user?.name ?? DummyData.guruName,
+          role: user?.roleLabel ??
+              '${DummyData.guruRole} · ${DummyData.guruHomeroom}',
+          initials: user?.initials ?? DummyData.guruInitials,
         ),
         const SizedBox(height: 16),
         const SectionHeader(title: 'Informasi akun'),
         const SizedBox(height: 10),
-        const ProfileInfoTile(
+        ProfileInfoTile(
           icon: Icons.mail_outline_rounded,
           label: 'Email',
-          value: DummyData.guruEmail,
+          value: user?.email ?? DummyData.guruEmail,
         ),
         const SizedBox(height: 8),
-        const ProfileInfoTile(
+        ProfileInfoTile(
           icon: Icons.phone_outlined,
           label: 'Nomor telepon',
-          value: DummyData.guruPhone,
+          value: user?.phone ?? DummyData.guruPhone,
         ),
         const SizedBox(height: 8),
         const ProfileInfoTile(
@@ -68,12 +70,12 @@ class GuruProfileScreen extends StatelessWidget {
           icon: Icons.logout_rounded,
           label: 'Keluar',
           danger: true,
-          onTap: session.logout,
+          onTap: session.isAuthenticating ? null : () => session.logout(),
         ),
         const SizedBox(height: 12),
         Center(
           child: Text(
-            'Mode demo · data tidak disimpan',
+            'Sesi aktif · logout membersihkan token lokal',
             style: AppText.style(size: 11.5, color: AppColors.muted),
           ),
         ),

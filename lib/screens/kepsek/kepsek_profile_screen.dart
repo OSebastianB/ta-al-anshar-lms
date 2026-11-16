@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../data/dummy_data.dart';
+import '../../state/kepsek_controller.dart';
 import '../../state/session_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
@@ -15,29 +15,31 @@ class KepsekProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
+    final kepsek = KepsekScope.of(context);
+    final user = session.user;
 
     return ListView(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        const ProfileHeader(
-          name: DummyData.kepsekName,
-          role: DummyData.kepsekRole,
-          initials: DummyData.kepsekInitials,
+        ProfileHeader(
+          name: user?.name ?? 'Kepala Sekolah',
+          role: user?.roleLabel ?? 'Kepala Sekolah',
+          initials: user?.initials ?? 'KS',
         ),
         const SizedBox(height: 16),
         const SectionHeader(title: 'Informasi akun'),
         const SizedBox(height: 10),
-        const ProfileInfoTile(
+        ProfileInfoTile(
           icon: Icons.mail_outline_rounded,
           label: 'Email',
-          value: DummyData.kepsekEmail,
+          value: user?.email ?? '—',
         ),
         const SizedBox(height: 8),
-        const ProfileInfoTile(
+        ProfileInfoTile(
           icon: Icons.phone_outlined,
           label: 'Nomor telepon',
-          value: DummyData.kepsekPhone,
+          value: user?.phone ?? '—',
         ),
         const SizedBox(height: 8),
         const ProfileInfoTile(
@@ -54,7 +56,10 @@ class KepsekProfileScreen extends StatelessWidget {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => const KepsekReportsScreen(),
+                builder: (_) => KepsekScope(
+                  controller: kepsek,
+                  child: const KepsekReportsScreen(),
+                ),
               ),
             );
           },
@@ -66,7 +71,10 @@ class KepsekProfileScreen extends StatelessWidget {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => const KepsekAnnouncementsScreen(),
+                builder: (_) => KepsekScope(
+                  controller: kepsek,
+                  child: const KepsekAnnouncementsScreen(),
+                ),
               ),
             );
           },
@@ -88,12 +96,12 @@ class KepsekProfileScreen extends StatelessWidget {
           icon: Icons.logout_rounded,
           label: 'Keluar',
           danger: true,
-          onTap: session.logout,
+          onTap: session.isAuthenticating ? null : () => session.logout(),
         ),
         const SizedBox(height: 12),
         Center(
           child: Text(
-            'Mode demo · data tidak disimpan',
+            'Navigasi khusus Kepala Sekolah · tanpa akses Guru/Ortu',
             style: AppText.style(size: 11.5, color: AppColors.muted),
           ),
         ),
@@ -107,7 +115,7 @@ class KepsekProfileScreen extends StatelessWidget {
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.navy,
         content: Text(
-          '$label hanya elemen visual pada mockup.',
+          '$label akan tersedia setelah integrasi backend.',
           style: AppText.style(size: 13, color: Colors.white),
         ),
       ),

@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../data/dummy_data.dart';
+import '../../state/kepsek_controller.dart';
+import '../../state/session_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 
@@ -12,16 +14,60 @@ class KepsekApprovalScreen extends StatefulWidget {
 }
 
 class _KepsekApprovalScreenState extends State<KepsekApprovalScreen> {
-  late final List<ScheduleApprovalItem> _items;
-
   @override
   void initState() {
     super.initState();
-    _items = DummyData.createScheduleApprovals();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final kepsek = KepsekScope.of(context);
+      final userId = SessionScope.of(context).user?.id;
+      if (userId != null) kepsek.bindKepsek(userId);
+      kepsek.loadApprovals();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final kepsek = KepsekScope.of(context);
+
+    if (kepsek.approvalState == LoadState.loading ||
+        kepsek.approvalState == LoadState.idle) {
+      return Center(
+        child: Text(
+          'Memuat persetujuan...',
+          style: AppText.style(size: 13.5, color: AppColors.muted),
+        ),
+      );
+    }
+
+    if (kepsek.approvalState == LoadState.error) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                kepsek.approvalError ?? 'Gagal memuat persetujuan.',
+                textAlign: TextAlign.center,
+                style: AppText.style(size: 14, color: AppColors.muted),
+              ),
+              TextButton(
+                onPressed: kepsek.loadApprovals,
+                child: Text(
+                  'Coba lagi',
+                  style: AppText.style(
+                    size: 13.5,
+                    weight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -40,27 +86,44 @@ class _KepsekApprovalScreenState extends State<KepsekApprovalScreen> {
           style: AppText.style(size: 13, color: AppColors.muted, height: 1.4),
         ),
         const SizedBox(height: 14),
-        for (final item in _items) ...[
-          _ApprovalCard(
-            item: item,
-            onOpen: () => _openDetail(item),
-          ),
-          const SizedBox(height: 12),
-        ],
+        if (kepsek.approvals.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Text(
+              'Tidak ada pengajuan jadwal untuk ditinjau.',
+              style: AppText.style(size: 13.5, color: AppColors.muted),
+            ),
+          )
+        else
+          for (final item in kepsek.approvals) ...[
+            _ApprovalCard(
+              item: item,
+              onOpen: () => _openDetail(kepsek, item),
+            ),
+            const SizedBox(height: 12),
+          ],
       ],
     );
   }
 
-  Future<void> _openDetail(ScheduleApprovalItem item) async {
+  Future<void> _openDetail(
+    KepsekController kepsek,
+    ScheduleApprovalItem item,
+  ) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => KepsekApprovalDetailScreen(
-          item: item,
-          onChanged: () => setState(() {}),
+        builder: (_) => KepsekScope(
+          controller: kepsek,
+          child: KepsekApprovalDetailScreen(item: item),
         ),
       ),
     );
-    setState(() {});
   }
 }
 
@@ -154,11 +217,9 @@ class KepsekApprovalDetailScreen extends StatefulWidget {
   const KepsekApprovalDetailScreen({
     super.key,
     required this.item,
-    required this.onChanged,
   });
 
   final ScheduleApprovalItem item;
-  final VoidCallback onChanged;
 
   @override
   State<KepsekApprovalDetailScreen> createState() =>
@@ -354,7 +415,7 @@ class _KepsekApprovalDetailScreenState
             ),
           ),
           content: Text(
-            'Jadwal akan ditandai Disetujui pada simulasi ini. Tidak ada data yang dikirim ke server.',
+            'Jadwal akan ditandai Disetujui. Generate otomatis tetap hanya di website Admin.',
             style: AppText.style(size: 14, color: AppColors.text, height: 1.4),
           ),
           actions: [
@@ -377,18 +438,36 @@ class _KepsekApprovalDetailScreenState
       },
     );
     if (ok != true || !mounted) return;
-    setState(() => item.status = ScheduleApprovalStatus.disetujui);
-    widget.onChanged();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.success,
-        content: Text(
-          'Jadwal disetujui (simulasi).',
-          style: AppText.style(size: 13, color: Colors.white),
+    try {
+      await KepsekScope.of(context).updateApproval(
+        approvalId: item.id,
+        status: ScheduleApprovalStatus.disetujui,
+      );
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.success,
+          content: Text(
+            'Jadwal disetujui.',
+            style: AppText.style(size: 13, color: Colors.white),
+          ),
         ),
-      ),
-    );
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.danger,
+          content: Text(
+            KepsekScope.of(context).approvalError ?? 'Gagal menyetujui jadwal.',
+            style: AppText.style(size: 13, color: Colors.white),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _confirmRevise(ScheduleApprovalItem item) async {
@@ -430,18 +509,37 @@ class _KepsekApprovalDetailScreenState
       },
     );
     if (ok != true || !mounted) return;
-    setState(() => item.status = ScheduleApprovalStatus.revisi);
-    widget.onChanged();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.navy,
-        content: Text(
-          'Jadwal dikembalikan untuk revisi (simulasi).',
-          style: AppText.style(size: 13, color: Colors.white),
+    try {
+      await KepsekScope.of(context).updateApproval(
+        approvalId: item.id,
+        status: ScheduleApprovalStatus.revisi,
+      );
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.navy,
+          content: Text(
+            'Jadwal dikembalikan untuk revisi.',
+            style: AppText.style(size: 13, color: Colors.white),
+          ),
         ),
-      ),
-    );
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.danger,
+          content: Text(
+            KepsekScope.of(context).approvalError ??
+                'Gagal mengembalikan jadwal.',
+            style: AppText.style(size: 13, color: Colors.white),
+          ),
+        ),
+      );
+    }
   }
 }
 

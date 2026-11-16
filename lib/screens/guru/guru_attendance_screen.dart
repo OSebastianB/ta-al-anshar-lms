@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../data/dummy_data.dart';
+import '../../core/errors/data_exception.dart';
+import '../../models/models.dart';
+import '../../state/guru_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/student_list_item.dart';
@@ -14,31 +16,108 @@ class GuruAttendanceScreen extends StatefulWidget {
 }
 
 class _GuruAttendanceScreenState extends State<GuruAttendanceScreen> {
-  String _className = DummyData.classOptions.first;
-  String _subject = DummyData.subjectOptions.first;
-  late Map<String, AttendanceStatus> _statuses;
-
   @override
   void initState() {
     super.initState();
-    _statuses = {
-      for (final student in DummyData.studentsVa) student.nis: student.status,
-    };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      GuruScope.of(context).loadAttendanceDraft();
+    });
   }
 
-  Map<AttendanceStatus, int> get _summary {
+  Map<AttendanceStatus, int> _summary(Map<String, AttendanceStatus> statuses) {
     final counts = {
       for (final status in AttendanceStatus.values) status: 0,
     };
-    for (final status in _statuses.values) {
+    for (final status in statuses.values) {
       counts[status] = (counts[status] ?? 0) + 1;
     }
     return counts;
   }
 
+  Future<void> _save(GuruController guru) async {
+    try {
+      final saved = await guru.saveAttendance();
+      if (!mounted || saved == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.navy,
+          content: Text(
+            'Absensi ${saved.className} · ${saved.subject} berhasil disimpan.',
+            style: AppText.style(size: 13, color: Colors.white),
+          ),
+        ),
+      );
+    } on DataException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.danger,
+          content: Text(
+            error.message,
+            style: AppText.style(size: 13, color: Colors.white),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final summary = _summary;
+    final guru = GuruScope.of(context);
+    final draft = guru.attendanceDraft;
+
+    if (guru.attendanceState == LoadState.loading ||
+        guru.attendanceState == LoadState.idle) {
+      return Center(
+        child: Text(
+          'Memuat absensi...',
+          style: AppText.style(size: 13.5, color: AppColors.muted),
+        ),
+      );
+    }
+
+    if (guru.attendanceState == LoadState.error && draft == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                guru.attendanceError ?? 'Gagal memuat absensi.',
+                textAlign: TextAlign.center,
+                style: AppText.style(size: 14, color: AppColors.muted),
+              ),
+              TextButton(
+                onPressed: () => guru.loadAttendanceDraft(),
+                child: Text(
+                  'Coba lagi',
+                  style: AppText.style(
+                    size: 13.5,
+                    weight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (draft == null) {
+      return Center(
+        child: Text(
+          'Form absensi belum tersedia.',
+          style: AppText.style(size: 14, color: AppColors.muted),
+        ),
+      );
+    }
+
+    final summary = _summary(draft.statuses);
+    final saving = guru.isSavingAttendance;
 
     return ListView(
       physics: const ClampingScrollPhysics(),
@@ -54,7 +133,7 @@ class _GuruAttendanceScreenState extends State<GuruAttendanceScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          DummyData.demoDateLabel,
+          draft.dateLabel,
           style: AppText.style(size: 13, color: AppColors.muted),
         ),
         const SizedBox(height: 14),
@@ -63,18 +142,20 @@ class _GuruAttendanceScreenState extends State<GuruAttendanceScreen> {
             Expanded(
               child: _DropdownCard(
                 label: 'Kelas',
-                value: _className,
-                options: DummyData.classOptions,
-                onChanged: (value) => setState(() => _className = value),
+                value: draft.className,
+                options: draft.classOptions,
+                enabled: !saving,
+                onChanged: guru.changeAttendanceClass,
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _DropdownCard(
                 label: 'Mata pelajaran',
-                value: _subject,
-                options: DummyData.subjectOptions,
-                onChanged: (value) => setState(() => _subject = value),
+                value: draft.subject,
+                options: draft.subjectOptions,
+                enabled: !saving,
+                onChanged: guru.changeAttendanceSubject,
               ),
             ),
           ],
@@ -105,13 +186,18 @@ class _GuruAttendanceScreenState extends State<GuruAttendanceScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const GuruAttendanceHistoryScreen(),
-                        ),
-                      );
-                    },
+                    onPressed: saving
+                        ? null
+                        : () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => GuruScope(
+                                  controller: guru,
+                                  child: const GuruAttendanceHistoryScreen(),
+                                ),
+                              ),
+                            );
+                          },
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.accent,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -170,6 +256,25 @@ class _GuruAttendanceScreenState extends State<GuruAttendanceScreen> {
             ],
           ),
         ),
+        if (guru.attendanceError != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFDE8E8),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFF3C1C1)),
+            ),
+            child: Text(
+              guru.attendanceError!,
+              style: AppText.style(
+                size: 12.5,
+                color: const Color(0xFF9B2C2C),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         Text(
           'Daftar siswa',
@@ -180,16 +285,31 @@ class _GuruAttendanceScreenState extends State<GuruAttendanceScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        for (final student in DummyData.studentsVa) ...[
-          StudentListItem(
-            student: student,
-            selectedStatus: _statuses[student.nis],
-            onStatusChanged: (status) {
-              setState(() => _statuses[student.nis] = status);
-            },
-          ),
-          const SizedBox(height: 10),
-        ],
+        if (draft.students.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Text(
+              'Tidak ada siswa pada kelas ini.',
+              style: AppText.style(size: 13.5, color: AppColors.muted),
+            ),
+          )
+        else
+          for (final student in draft.students) ...[
+            StudentListItem(
+              student: student,
+              selectedStatus: draft.statuses[student.nis],
+              onStatusChanged: saving
+                  ? null
+                  : (status) => guru.setAttendanceStatus(student.nis, status),
+            ),
+            const SizedBox(height: 10),
+          ],
         const SizedBox(height: 4),
         SizedBox(
           width: double.infinity,
@@ -197,30 +317,32 @@ class _GuruAttendanceScreenState extends State<GuruAttendanceScreen> {
           child: FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.accent,
+              disabledBackgroundColor:
+                  AppColors.accent.withValues(alpha: 0.6),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: AppColors.navy,
-                  content: Text(
-                    'Absensi $_className · $_subject tersimpan (simulasi).',
-                    style: AppText.style(size: 13, color: Colors.white),
+            onPressed: saving || draft.students.isEmpty
+                ? null
+                : () => _save(guru),
+            child: saving
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    'Simpan absensi',
+                    style: AppText.style(
+                      size: 15,
+                      weight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-              );
-            },
-            child: Text(
-              'Simpan absensi',
-              style: AppText.style(
-                size: 15,
-                weight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
           ),
         ),
       ],
@@ -234,12 +356,14 @@ class _DropdownCard extends StatelessWidget {
     required this.value,
     required this.options,
     required this.onChanged,
+    this.enabled = true,
   });
 
   final String label;
   final String value;
   final List<String> options;
   final ValueChanged<String> onChanged;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -274,9 +398,11 @@ class _DropdownCard extends StatelessWidget {
                 for (final option in options)
                   DropdownMenuItem(value: option, child: Text(option)),
               ],
-              onChanged: (selected) {
-                if (selected != null) onChanged(selected);
-              },
+              onChanged: enabled
+                  ? (selected) {
+                      if (selected != null) onChanged(selected);
+                    }
+                  : null,
             ),
           ),
         ],

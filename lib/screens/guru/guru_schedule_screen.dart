@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../data/dummy_data.dart';
+import '../../state/guru_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/day_selector.dart';
@@ -15,12 +15,57 @@ class GuruScheduleScreen extends StatefulWidget {
 }
 
 class _GuruScheduleScreenState extends State<GuruScheduleScreen> {
-  String _dayKey = DummyData.weekDays.first.key;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      GuruScope.of(context).loadSchedule();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final day = DummyData.weekDays.firstWhere((item) => item.key == _dayKey);
-    final items = DummyData.guruWeeklySchedule[_dayKey] ?? const <ScheduleItem>[];
+    final guru = GuruScope.of(context);
+    final day = guru.selectedDay;
+
+    if (guru.scheduleState == LoadState.loading ||
+        guru.scheduleState == LoadState.idle) {
+      return Center(
+        child: Text(
+          'Memuat jadwal...',
+          style: AppText.style(size: 13.5, color: AppColors.muted),
+        ),
+      );
+    }
+
+    if (guru.scheduleState == LoadState.error) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                guru.scheduleError ?? 'Gagal memuat jadwal.',
+                textAlign: TextAlign.center,
+                style: AppText.style(size: 14, color: AppColors.muted),
+              ),
+              TextButton(
+                onPressed: () => guru.loadSchedule(),
+                child: Text(
+                  'Coba lagi',
+                  style: AppText.style(
+                    size: 13.5,
+                    weight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return ListView(
       physics: const ClampingScrollPhysics(),
@@ -37,18 +82,22 @@ class _GuruScheduleScreenState extends State<GuruScheduleScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Navigasi hari dan daftar sesi Matematika.',
+          'Pilih hari untuk melihat sesi mengajar.',
           style: AppText.style(size: 13, color: AppColors.muted),
         ),
         const SizedBox(height: 14),
-        DaySelector(
-          selectedKey: _dayKey,
-          onSelected: (value) => setState(() => _dayKey = value),
-        ),
+        if (guru.weekDays.isNotEmpty)
+          DaySelector(
+            days: guru.weekDays,
+            selectedKey: guru.selectedDayKey,
+            onSelected: guru.selectScheduleDay,
+          ),
         const SizedBox(height: 16),
-        SectionHeader(title: '${day.label}, ${day.dateLabel}'),
-        const SizedBox(height: 10),
-        if (items.isEmpty)
+        if (day != null) ...[
+          SectionHeader(title: '${day.label}, ${day.dateLabel}'),
+          const SizedBox(height: 10),
+        ],
+        if (guru.scheduleItems.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(18),
@@ -63,7 +112,7 @@ class _GuruScheduleScreenState extends State<GuruScheduleScreen> {
             ),
           )
         else
-          for (final item in items) ...[
+          for (final item in guru.scheduleItems) ...[
             ScheduleCard(
               item: item,
               onTap: () => showScheduleDetail(context, item),

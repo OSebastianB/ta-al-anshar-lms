@@ -1,10 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../data/dummy_data.dart';
+import '../../state/kepsek_controller.dart';
 import '../../state/session_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/announcement_card.dart';
+import '../../widgets/async_state_view.dart';
 import '../../widgets/notification_item.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/shortcut_tile.dart';
@@ -13,305 +15,340 @@ import '../common/notifications_screen.dart';
 import 'kepsek_announcements_screen.dart';
 import 'kepsek_reports_screen.dart';
 
-class KepsekDashboardScreen extends StatelessWidget {
+class KepsekDashboardScreen extends StatefulWidget {
   const KepsekDashboardScreen({super.key});
+
+  @override
+  State<KepsekDashboardScreen> createState() => _KepsekDashboardScreenState();
+}
+
+class _KepsekDashboardScreenState extends State<KepsekDashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final kepsek = KepsekScope.of(context);
+      final userId = SessionScope.of(context).user?.id;
+      if (userId != null) kepsek.bindKepsek(userId);
+      kepsek.loadDashboard();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
-    final pending = DummyData.createScheduleApprovals()
-        .where((item) => item.status == ScheduleApprovalStatus.menunggu)
-        .length;
+    final kepsek = KepsekScope.of(context);
+    final user = session.user;
+    final data = kepsek.dashboard;
 
-    return ListView(
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Assalamu\'alaikum,',
-                    style: AppText.style(size: 13.5, color: AppColors.muted),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    DummyData.kepsekName,
-                    style: AppText.style(
-                      size: 22,
-                      weight: FontWeight.w800,
-                      color: AppColors.navy,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    DummyData.kepsekRole,
-                    style: AppText.style(
-                      size: 13,
-                      weight: FontWeight.w600,
-                      color: AppColors.navyMid,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.today_outlined,
-                          size: 14,
-                          color: AppColors.accent,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          DummyData.demoDateLabel,
-                          style: AppText.style(
-                            size: 12,
-                            weight: FontWeight.w600,
-                            color: AppColors.text,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 52,
-              height: 52,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.accentSoft,
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFC5D8F0)),
-              ),
-              child: Text(
-                DummyData.kepsekInitials,
-                style: AppText.style(
-                  size: 16,
-                  weight: FontWeight.w800,
-                  color: AppColors.navy,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: SummaryCard(
-                icon: Icons.groups_outlined,
-                iconColor: AppColors.accent,
-                iconBackground: AppColors.accentSoft,
-                label: 'Total siswa',
-                value: '${DummyData.totalStudents}',
-                hint: 'Seluruh tingkat',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: SummaryCard(
-                icon: Icons.badge_outlined,
-                iconColor: AppColors.navy,
-                iconBackground: const Color(0xFFE8EEF7),
-                label: 'Total guru',
-                value: '${DummyData.totalTeachers}',
-                hint: 'Aktif mengajar',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: SummaryCard(
-                icon: Icons.meeting_room_outlined,
-                iconColor: AppColors.purple,
-                iconBackground: AppColors.purpleSoft,
-                label: 'Total kelas',
-                value: '${DummyData.totalClasses}',
-                hint: 'I–VI',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: SummaryCard(
-                icon: Icons.pie_chart_outline_rounded,
-                iconColor: AppColors.success,
-                iconBackground: AppColors.successSoft,
-                label: 'Hadir siswa',
-                value: '${DummyData.studentPresencePercent.toStringAsFixed(0)}%',
-                hint:
-                    'Guru ${DummyData.teacherPresencePercent.toStringAsFixed(0)}%',
-                onTap: () => session.setTab(1),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Material(
-          color: AppColors.warningSoft,
-          borderRadius: BorderRadius.circular(13),
-          child: InkWell(
-            onTap: () => session.setTab(2),
-            borderRadius: BorderRadius.circular(13),
-            child: Ink(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(13),
-                border: Border.all(color: const Color(0xFFF3DFB8)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
+    return AsyncStateView(
+      state: kepsek.dashboardState,
+      errorMessage: kepsek.dashboardError,
+      emptyMessage: 'Dashboard Kepala Sekolah belum tersedia.',
+      onRetry: kepsek.loadDashboard,
+      padding: const EdgeInsets.fromLTRB(16, 48, 16, 24),
+      child: data == null
+          ? const SizedBox.shrink()
+          : ListView(
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.pending_actions_outlined,
-                        color: AppColors.warningInk,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Jadwal menunggu persetujuan',
+                            'Assalamu\'alaikum,',
                             style: AppText.style(
-                              size: 14,
-                              weight: FontWeight.w700,
-                              color: AppColors.navy,
+                              size: 13.5,
+                              color: AppColors.muted,
                             ),
                           ),
+                          const SizedBox(height: 2),
                           Text(
-                            '$pending hasil generate CSP siap ditinjau',
+                            user?.name ?? 'Kepala Sekolah',
                             style: AppText.style(
-                              size: 12.5,
-                              color: AppColors.muted,
+                              size: 22,
+                              weight: FontWeight.w800,
+                              color: AppColors.navy,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            user?.roleLabel ?? 'Kepala Sekolah',
+                            style: AppText.style(
+                              size: 13,
+                              weight: FontWeight.w600,
+                              color: AppColors.navyMid,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.card,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.today_outlined,
+                                  size: 14,
+                                  color: AppColors.accent,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  data.dateLabel,
+                                  style: AppText.style(
+                                    size: 12,
+                                    weight: FontWeight.w600,
+                                    color: AppColors.text,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.warningInk,
+                    Container(
+                      width: 52,
+                      height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.accentSoft,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFC5D8F0)),
+                      ),
+                      child: Text(
+                        user?.initials ?? 'KS',
+                        style: AppText.style(
+                          size: 16,
+                          weight: FontWeight.w800,
+                          color: AppColors.navy,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 22),
-        const SectionHeader(title: 'Ringkasan aktivitas sekolah'),
-        const SizedBox(height: 10),
-        for (final item in DummyData.schoolActivities) ...[
-          AnnouncementCard(item: item),
-          const SizedBox(height: 10),
-        ],
-        const SizedBox(height: 12),
-        SectionHeader(
-          title: 'Jadwal pelajaran hari ini',
-          action: 'Monitoring',
-          onAction: () => session.setTab(1),
-        ),
-        const SizedBox(height: 10),
-        for (final item in DummyData.todaySchoolSchedule.take(3)) ...[
-          _SchoolScheduleTile(item: item),
-          const SizedBox(height: 10),
-        ],
-        const SizedBox(height: 12),
-        SectionHeader(
-          title: 'Notifikasi penting',
-          action: 'Semua',
-          onAction: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const NotificationsScreen(),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 10),
-        for (final item in DummyData.kepsekNotices.take(2)) ...[
-          NotificationItem(item: item),
-          const SizedBox(height: 10),
-        ],
-        const SizedBox(height: 12),
-        const SectionHeader(title: 'Menu cepat'),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: ShortcutTile(
-                icon: Icons.monitor_heart_outlined,
-                label: 'Monitoring',
-                onTap: () => session.setTab(1),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ShortcutTile(
-                icon: Icons.fact_check_outlined,
-                label: 'Persetujuan',
-                onTap: () => session.setTab(2),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ShortcutTile(
-                icon: Icons.bar_chart_rounded,
-                label: 'Laporan',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const KepsekReportsScreen(),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SummaryCard(
+                        icon: Icons.groups_outlined,
+                        iconColor: AppColors.accent,
+                        iconBackground: AppColors.accentSoft,
+                        label: 'Total siswa',
+                        value: '${data.totalStudents}',
+                        hint: 'Seluruh tingkat',
+                      ),
                     ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ShortcutTile(
-                icon: Icons.campaign_outlined,
-                label: 'Pengumuman',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const KepsekAnnouncementsScreen(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SummaryCard(
+                        icon: Icons.badge_outlined,
+                        iconColor: AppColors.navy,
+                        iconBackground: const Color(0xFFE8EEF7),
+                        label: 'Total guru',
+                        value: '${data.totalTeachers}',
+                        hint: 'Aktif mengajar',
+                      ),
                     ),
-                  );
-                },
-              ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SummaryCard(
+                        icon: Icons.meeting_room_outlined,
+                        iconColor: AppColors.purple,
+                        iconBackground: AppColors.purpleSoft,
+                        label: 'Total kelas',
+                        value: '${data.totalClasses}',
+                        hint: 'I–VI',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SummaryCard(
+                        icon: Icons.pie_chart_outline_rounded,
+                        iconColor: AppColors.success,
+                        iconBackground: AppColors.successSoft,
+                        label: 'Hadir siswa',
+                        value:
+                            '${data.studentPresencePercent.toStringAsFixed(0)}%',
+                        hint:
+                            'Guru ${data.teacherPresencePercent.toStringAsFixed(0)}%',
+                        onTap: () => session.setTab(1),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Material(
+                  color: AppColors.warningSoft,
+                  borderRadius: BorderRadius.circular(13),
+                  child: InkWell(
+                    onTap: () => session.setTab(2),
+                    borderRadius: BorderRadius.circular(13),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(color: const Color(0xFFF3DFB8)),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.pending_actions_outlined,
+                                color: AppColors.warningInk,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Jadwal menunggu persetujuan',
+                                    style: AppText.style(
+                                      size: 14,
+                                      weight: FontWeight.w700,
+                                      color: AppColors.navy,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${data.pendingApprovals} pengajuan siap ditinjau',
+                                    style: AppText.style(
+                                      size: 12.5,
+                                      color: AppColors.muted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: AppColors.warningInk,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const SectionHeader(title: 'Ringkasan aktivitas sekolah'),
+                const SizedBox(height: 10),
+                for (final item in data.activities) ...[
+                  AnnouncementCard(item: item),
+                  const SizedBox(height: 10),
+                ],
+                const SizedBox(height: 12),
+                SectionHeader(
+                  title: 'Jadwal pelajaran hari ini',
+                  action: 'Monitoring',
+                  onAction: () => session.setTab(1),
+                ),
+                const SizedBox(height: 10),
+                for (final item in data.todaySchedule.take(3)) ...[
+                  _SchoolScheduleTile(item: item),
+                  const SizedBox(height: 10),
+                ],
+                const SizedBox(height: 12),
+                SectionHeader(
+                  title: 'Notifikasi penting',
+                  action: 'Semua',
+                  onAction: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                for (final item in data.notices.take(2)) ...[
+                  NotificationItem(item: item),
+                  const SizedBox(height: 10),
+                ],
+                const SizedBox(height: 12),
+                const SectionHeader(title: 'Menu cepat'),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ShortcutTile(
+                        icon: Icons.monitor_heart_outlined,
+                        label: 'Monitoring',
+                        onTap: () => session.setTab(1),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ShortcutTile(
+                        icon: Icons.fact_check_outlined,
+                        label: 'Persetujuan',
+                        onTap: () => session.setTab(2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ShortcutTile(
+                        icon: Icons.bar_chart_rounded,
+                        label: 'Laporan',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => KepsekScope(
+                                controller: kepsek,
+                                child: const KepsekReportsScreen(),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ShortcutTile(
+                        icon: Icons.campaign_outlined,
+                        label: 'Pengumuman',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => KepsekScope(
+                                controller: kepsek,
+                                child: const KepsekAnnouncementsScreen(),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -351,10 +388,7 @@ class _SchoolScheduleTile extends StatelessWidget {
                 ),
                 Text(
                   item.end,
-                  style: AppText.style(
-                    size: 11,
-                    color: AppColors.navyMid,
-                  ),
+                  style: AppText.style(size: 11, color: AppColors.navyMid),
                 ),
               ],
             ),

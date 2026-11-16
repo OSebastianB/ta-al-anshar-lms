@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../data/dummy_data.dart';
+import '../../state/parent_controller.dart';
+import '../../state/session_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/day_selector.dart';
@@ -15,20 +16,84 @@ class OrangtuaScheduleScreen extends StatefulWidget {
 }
 
 class _OrangtuaScheduleScreenState extends State<OrangtuaScheduleScreen> {
-  String _dayKey = DummyData.weekDays.first.key;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final parent = ParentScope.of(context);
+      final userId = SessionScope.of(context).user?.id;
+      if (userId != null) parent.bindParent(userId);
+      parent.loadSchedule();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final day = DummyData.weekDays.firstWhere((item) => item.key == _dayKey);
-    final items =
-        DummyData.childWeeklySchedule[_dayKey] ?? const <ScheduleItem>[];
+    final parent = ParentScope.of(context);
+    final data = parent.schedule;
+
+    if (parent.scheduleState == LoadState.loading ||
+        parent.scheduleState == LoadState.idle) {
+      return Center(
+        child: Text(
+          'Memuat jadwal...',
+          style: AppText.style(size: 13.5, color: AppColors.muted),
+        ),
+      );
+    }
+
+    if (parent.scheduleState == LoadState.empty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            parent.scheduleError ??
+                'Tidak ada anak yang terhubung dengan akun ini.',
+            textAlign: TextAlign.center,
+            style: AppText.style(size: 14, color: AppColors.muted),
+          ),
+        ),
+      );
+    }
+
+    if (parent.scheduleState == LoadState.error || data == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                parent.scheduleError ?? 'Gagal memuat jadwal.',
+                textAlign: TextAlign.center,
+                style: AppText.style(size: 14, color: AppColors.muted),
+              ),
+              TextButton(
+                onPressed: () => parent.loadSchedule(),
+                child: Text(
+                  'Coba lagi',
+                  style: AppText.style(
+                    size: 13.5,
+                    weight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final day = data.selectedDay;
+    final childFirstName = data.child.name.split(' ').first;
 
     return ListView(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
         Text(
-          'Jadwal ${DummyData.childName.split(' ').first}',
+          'Jadwal $childFirstName',
           style: AppText.style(
             size: 18,
             weight: FontWeight.w800,
@@ -38,18 +103,22 @@ class _OrangtuaScheduleScreenState extends State<OrangtuaScheduleScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          '${DummyData.childClass} · mata pelajaran, guru, jam, dan ruangan.',
+          '${data.child.classLabel} · mata pelajaran, guru, jam, dan ruangan.',
           style: AppText.style(size: 13, color: AppColors.muted),
         ),
         const SizedBox(height: 14),
-        DaySelector(
-          selectedKey: _dayKey,
-          onSelected: (value) => setState(() => _dayKey = value),
-        ),
+        if (data.weekDays.isNotEmpty)
+          DaySelector(
+            days: data.weekDays,
+            selectedKey: data.selectedDayKey,
+            onSelected: parent.selectScheduleDay,
+          ),
         const SizedBox(height: 16),
-        SectionHeader(title: '${day.label}, ${day.dateLabel}'),
-        const SizedBox(height: 10),
-        if (items.isEmpty)
+        if (day != null) ...[
+          SectionHeader(title: '${day.label}, ${day.dateLabel}'),
+          const SizedBox(height: 10),
+        ],
+        if (data.items.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(18),
@@ -64,7 +133,7 @@ class _OrangtuaScheduleScreenState extends State<OrangtuaScheduleScreen> {
             ),
           )
         else
-          for (final item in items) ...[
+          for (final item in data.items) ...[
             ScheduleCard(
               item: item,
               onTap: () => showScheduleDetail(context, item),
