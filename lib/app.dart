@@ -17,6 +17,11 @@ import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'widgets/lms_bottom_nav.dart';
 
+/// Root aplikasi sekaligus tempat merakit dependensi (composition root).
+///
+/// Semua repository bisa diganti lewat konstruktor. Tes memakai mock tanpa
+/// delay; nanti implementasi API dimasukkan di sini tanpa menyentuh layar.
+/// Parameter yang tidak diisi memakai implementasi mock/default.
 class LmsApp extends StatefulWidget {
   const LmsApp({
     super.key,
@@ -27,7 +32,6 @@ class LmsApp extends StatefulWidget {
     this.kepsekRepository,
   });
 
-  /// Override untuk tes atau implementasi API nanti.
   final AuthRepository? authRepository;
   final SessionStorage? sessionStorage;
   final GuruRepository? guruRepository;
@@ -80,7 +84,12 @@ class _LmsAppState extends State<LmsApp> {
   }
 }
 
-/// Gate navigasi berbasis sesi/role. MaterialApp tidak di-recreate saat tab berubah.
+/// Menentukan layar yang tampil dari status sesi:
+/// memulihkan sesi -> loading, belum login -> [LoginScreen],
+/// sudah login -> shell sesuai role akun.
+///
+/// Berada di dalam [MaterialApp] sehingga pergantian role/tab tidak
+/// membuat ulang MaterialApp (tema dan navigator tetap).
 class _AuthGate extends StatelessWidget {
   const _AuthGate();
 

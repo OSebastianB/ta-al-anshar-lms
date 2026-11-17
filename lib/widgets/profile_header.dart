@@ -1,8 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../state/session_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
+// Komponen bersama untuk layar Profil semua role.
+
+/// Kartu nama + inisial di bagian atas layar Profil.
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
     super.key,
@@ -72,6 +76,7 @@ class ProfileHeader extends StatelessWidget {
   }
 }
 
+/// Baris informasi read-only (email, telepon, jabatan).
 class ProfileInfoTile extends StatelessWidget {
   const ProfileInfoTile({
     super.key,
@@ -131,6 +136,7 @@ class ProfileInfoTile extends StatelessWidget {
   }
 }
 
+/// Baris menu yang bisa ditekan. [danger] memberi warna merah (mis. Keluar).
 class ProfileActionTile extends StatelessWidget {
   const ProfileActionTile({
     super.key,
@@ -188,4 +194,35 @@ class ProfileActionTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Tombol Keluar. Nonaktif selama proses login/logout berjalan agar tidak
+/// terpanggil dua kali.
+class ProfileLogoutTile extends StatelessWidget {
+  const ProfileLogoutTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final session = SessionScope.of(context);
+    return ProfileActionTile(
+      icon: Icons.logout_rounded,
+      label: 'Keluar',
+      danger: true,
+      onTap: session.isAuthenticating ? null : session.logout,
+    );
+  }
+}
+
+/// Snackbar untuk menu yang belum punya endpoint backend.
+void showPendingFeature(BuildContext context, String label) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppColors.navy,
+      content: Text(
+        '$label akan tersedia setelah integrasi backend.',
+        style: AppText.style(size: 13, color: Colors.white),
+      ),
+    ),
+  );
 }

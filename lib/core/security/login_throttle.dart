@@ -1,3 +1,8 @@
+/// Mengunci sementara username setelah [maxAttempts] kali login gagal.
+///
+/// Disimpan di memori, jadi hitungan reset saat aplikasi ditutup. Ini hanya
+/// menghambat tebak password dari layar aplikasi; rate limit sesungguhnya
+/// tetap harus diterapkan di backend.
 class LoginThrottle {
   LoginThrottle({
     this.maxAttempts = 5,

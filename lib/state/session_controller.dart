@@ -10,6 +10,15 @@ import '../services/auth_service.dart';
 
 export '../models/app_role.dart';
 
+/// Sumber kebenaran status login untuk seluruh aplikasi.
+///
+/// Tanggung jawab:
+/// - memulihkan sesi tersimpan saat aplikasi dibuka ([bootstrap])
+/// - login dengan pembatas percobaan gagal ([LoginThrottle])
+/// - logout dan reset tab aktif
+/// - menyimpan indeks tab bottom nav ([tabIndex]) untuk `RoleScaffold`
+///
+/// Diakses dari widget lewat `SessionScope.of(context)`.
 class SessionController extends ChangeNotifier {
   SessionController({
     required this.authService,
@@ -58,6 +67,9 @@ class SessionController extends ChangeNotifier {
     return authService.rememberedUsername();
   }
 
+  /// Melempar `AuthException`; pesannya juga disimpan di [lastError].
+  /// Kode `locked` berarti akun sedang dikunci sementara karena terlalu
+  /// banyak percobaan gagal.
   Future<void> login({
     required String username,
     required String password,
@@ -147,6 +159,7 @@ class SessionController extends ChangeNotifier {
   bool canAccess(AppRole requiredRole) => role == requiredRole;
 }
 
+/// Menyediakan [SessionController] ke seluruh widget tree.
 class SessionScope extends InheritedNotifier<SessionController> {
   const SessionScope({
     super.key,

@@ -5,6 +5,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../models/auth_session.dart';
 import 'session_storage.dart';
 
+/// Implementasi [SessionStorage] default di perangkat: data dienkripsi oleh
+/// Android Keystore lewat `flutter_secure_storage`.
+///
+/// Data rusak atau sesi kedaluwarsa langsung dihapus saat dibaca, sehingga
+/// pengguna diminta login ulang alih-alih aplikasi crash.
 class SecureSessionStorage implements SessionStorage {
   SecureSessionStorage({FlutterSecureStorage? storage})
       : _storage = storage ??

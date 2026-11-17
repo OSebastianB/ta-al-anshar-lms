@@ -37,6 +37,39 @@ flutter test
 
 Chip role di login mengisi username saja. Role mengikuti hasil login.
 
-## Catatan
+## Panduan pengembang
 
-Data masih memakai mock repository sampai API backend tersedia. Base URL bisa di-set lewat `--dart-define=API_BASE_URL=...`.
+### Struktur `lib/`
+
+| Folder | Isi |
+|--------|-----|
+| `core/` | Konfigurasi (`AppConfig`), exception, keamanan, penyimpanan sesi |
+| `models/` | Model data per role |
+| `repositories/` | Kontrak data (`*_repository.dart`) + implementasi mock (`mock_*.dart`) |
+| `services/` | `AuthService`: login/logout + penyimpanan sesi |
+| `state/` | Controller per role (`ChangeNotifier`) + `AsyncRunner` |
+| `screens/` | Layar per role; `*_shell.dart` = halaman utama berisi tab |
+| `widgets/` | Komponen UI bersama, termasuk `RoleScaffold` |
+
+### Alur data
+
+```
+Screen -> XxxScope.of(context) -> XxxController -> XxxRepository (mock / API)
+```
+
+- Layar hanya membaca field controller (`dashboard`, `dashboardState`, `dashboardError`) dan memanggil method `loadXxx()`.
+- Controller memakai `runLoad` / `runAction` dari `AsyncRunner` untuk loading, error, dan status kosong.
+- Role ditentukan dari akun yang login, lalu `_AuthGate` di `app.dart` membuka shell yang sesuai.
+
+### Menambah tab baru
+
+1. Buat layar di `screens/<role>/`.
+2. Tambahkan `RoleTab` di `*_shell.dart` role tersebut.
+3. Jika butuh data baru: tambah method di kontrak repository, implementasikan di mock, lalu tambah `loadXxx()` di controller.
+
+### Mengganti mock ke API
+
+1. Buat kelas baru yang `implements` kontrak repository (mis. `ApiGuruRepository`).
+2. Lempar `DataException` / `AuthException` berisi pesan untuk pengguna.
+3. Masukkan ke `LmsApp(...)` di `main.dart`. Layar dan controller tidak perlu diubah.
+4. Set base URL dengan `--dart-define=API_BASE_URL=...`.

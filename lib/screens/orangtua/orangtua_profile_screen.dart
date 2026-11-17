@@ -150,27 +150,22 @@ class _OrangtuaProfileScreenState extends State<OrangtuaProfileScreen> {
         ProfileActionTile(
           icon: Icons.lock_outline_rounded,
           label: 'Ubah password',
-          onTap: () => _demo(context, 'Ubah password'),
+          onTap: () => showPendingFeature(context, 'Ubah password'),
         ),
         const SizedBox(height: 8),
         ProfileActionTile(
           icon: Icons.notifications_outlined,
           label: 'Preferensi notifikasi',
-          onTap: () => _demo(context, 'Preferensi notifikasi'),
+          onTap: () => showPendingFeature(context, 'Preferensi notifikasi'),
         ),
         const SizedBox(height: 8),
         ProfileActionTile(
           icon: Icons.info_outline_rounded,
           label: 'Tentang aplikasi',
-          onTap: () => _demo(context, 'Tentang aplikasi'),
+          onTap: () => showPendingFeature(context, 'Tentang aplikasi'),
         ),
         const SizedBox(height: 16),
-        ProfileActionTile(
-          icon: Icons.logout_rounded,
-          label: 'Keluar',
-          danger: true,
-          onTap: session.isAuthenticating ? null : () => session.logout(),
-        ),
+        const ProfileLogoutTile(),
         const SizedBox(height: 12),
         Center(
           child: Text(
@@ -179,19 +174,6 @@ class _OrangtuaProfileScreenState extends State<OrangtuaProfileScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  void _demo(BuildContext context, String label) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.navy,
-        content: Text(
-          '$label akan tersedia setelah integrasi backend.',
-          style: AppText.style(size: 13, color: Colors.white),
-        ),
-      ),
     );
   }
 }

@@ -3,11 +3,17 @@ import 'package:flutter/widgets.dart';
 import '../core/errors/data_exception.dart';
 import '../models/parent_models.dart';
 import '../repositories/parent_repository.dart';
+import 'async_runner.dart';
 import 'load_state.dart';
 
 export 'load_state.dart';
 
-class ParentController extends ChangeNotifier {
+/// State layar role Orang Tua.
+///
+/// Semua request membawa `parentUserId` dari sesi login (lihat [bindParent]),
+/// sehingga orang tua hanya bisa melihat anak yang terhubung ke akunnya.
+/// Bila punya lebih dari satu anak, [selectedChildId] menentukan anak aktif.
+class ParentController extends ChangeNotifier with AsyncRunner {
   ParentController({required this.repository});
 
   final ParentRepository repository;
@@ -39,6 +45,8 @@ class ParentController extends ChangeNotifier {
     return linkedChildren.first;
   }
 
+  /// Mengikat controller ke akun yang login. Jika akun berganti, data anak
+  /// sebelumnya dibuang agar tidak bocor ke akun lain.
   void bindParent(String parentUserId) {
     if (_parentUserId == parentUserId) return;
     _parentUserId = parentUserId;
@@ -60,33 +68,37 @@ class ParentController extends ChangeNotifier {
     return id;
   }
 
-  Future<void> loadLinkedChildren() async {
-    childrenState = LoadState.loading;
-    childrenError = null;
-    notifyListeners();
-    try {
-      linkedChildren = await repository.fetchLinkedChildren(
-        parentUserId: _requireParentId,
-      );
-      if (linkedChildren.isEmpty) {
-        selectedChildId = null;
-        childrenState = LoadState.empty;
-      } else {
-        selectedChildId ??= linkedChildren.first.id;
-        final exists = linkedChildren.any((c) => c.id == selectedChildId);
-        if (!exists) selectedChildId = linkedChildren.first.id;
-        childrenState = LoadState.ready;
-      }
-    } on DataException catch (error) {
-      childrenError = error.message;
-      childrenState = LoadState.error;
-    } catch (_) {
-      childrenError = 'Gagal memuat data anak terhubung.';
-      childrenState = LoadState.error;
-    }
-    notifyListeners();
+  /// `no_linked_child` bukan kegagalan teknis: tampilkan sebagai kosong.
+  static LoadState _emptyIfNoChild(DataException error) {
+    return error.code == 'no_linked_child' ? LoadState.empty : LoadState.error;
   }
 
+  Future<void> _ensureChildrenLoaded() async {
+    if (linkedChildren.isEmpty) await loadLinkedChildren();
+  }
+
+  Future<void> loadLinkedChildren() => runLoad(
+        update: (state, error) {
+          childrenState = state;
+          childrenError = error;
+        },
+        fallbackError: 'Gagal memuat data anak terhubung.',
+        task: () async {
+          linkedChildren = await repository.fetchLinkedChildren(
+            parentUserId: _requireParentId,
+          );
+          if (linkedChildren.isEmpty) {
+            selectedChildId = null;
+            return LoadState.empty;
+          }
+          final stillLinked =
+              linkedChildren.any((child) => child.id == selectedChildId);
+          if (!stillLinked) selectedChildId = linkedChildren.first.id;
+          return LoadState.ready;
+        },
+      );
+
+  /// Ganti anak aktif lalu muat ulang semua tab untuk anak tersebut.
   Future<void> selectChild(String childId) async {
     final allowed = linkedChildren.any((child) => child.id == childId);
     if (!allowed) {
@@ -102,91 +114,71 @@ class ParentController extends ChangeNotifier {
     ]);
   }
 
-  Future<void> loadDashboard() async {
-    dashboardState = LoadState.loading;
-    dashboardError = null;
-    notifyListeners();
-    try {
-      if (linkedChildren.isEmpty) {
-        await loadLinkedChildren();
-      }
-      dashboard = await repository.fetchDashboard(
-        parentUserId: _requireParentId,
-        childId: selectedChildId,
+  Future<void> loadDashboard() => runLoad(
+        update: (state, error) {
+          dashboardState = state;
+          dashboardError = error;
+        },
+        fallbackError: 'Gagal memuat dashboard orang tua.',
+        stateOnError: _emptyIfNoChild,
+        task: () async {
+          await _ensureChildrenLoaded();
+          final data = await repository.fetchDashboard(
+            parentUserId: _requireParentId,
+            childId: selectedChildId,
+          );
+          dashboard = data;
+          selectedChildId = data.child.id;
+          return LoadState.ready;
+        },
       );
-      selectedChildId = dashboard!.child.id;
-      dashboardState = LoadState.ready;
-    } on DataException catch (error) {
-      dashboardError = error.message;
-      dashboardState = error.code == 'no_linked_child'
-          ? LoadState.empty
-          : LoadState.error;
-    } catch (_) {
-      dashboardError = 'Gagal memuat dashboard orang tua.';
-      dashboardState = LoadState.error;
-    }
-    notifyListeners();
-  }
 
-  Future<void> loadAttendance({String? month}) async {
-    attendanceState = LoadState.loading;
-    attendanceError = null;
-    notifyListeners();
-    try {
-      if (linkedChildren.isEmpty) {
-        await loadLinkedChildren();
-      }
-      attendance = await repository.fetchAttendance(
-        parentUserId: _requireParentId,
-        childId: selectedChildId,
-        month: month,
+  Future<void> loadAttendance({String? month}) => runLoad(
+        update: (state, error) {
+          attendanceState = state;
+          attendanceError = error;
+        },
+        fallbackError: 'Gagal memuat kehadiran anak.',
+        stateOnError: _emptyIfNoChild,
+        task: () async {
+          await _ensureChildrenLoaded();
+          final data = await repository.fetchAttendance(
+            parentUserId: _requireParentId,
+            childId: selectedChildId,
+            month: month,
+          );
+          attendance = data;
+          selectedChildId = data.child.id;
+          return LoadState.ready;
+        },
       );
-      selectedChildId = attendance!.child.id;
-      attendanceState = LoadState.ready;
-    } on DataException catch (error) {
-      attendanceError = error.message;
-      attendanceState = error.code == 'no_linked_child'
-          ? LoadState.empty
-          : LoadState.error;
-    } catch (_) {
-      attendanceError = 'Gagal memuat kehadiran anak.';
-      attendanceState = LoadState.error;
-    }
-    notifyListeners();
-  }
 
-  Future<void> loadSchedule({String? dayKey}) async {
-    scheduleState = LoadState.loading;
-    scheduleError = null;
-    notifyListeners();
-    try {
-      if (linkedChildren.isEmpty) {
-        await loadLinkedChildren();
-      }
-      schedule = await repository.fetchSchedule(
-        parentUserId: _requireParentId,
-        childId: selectedChildId,
-        dayKey: dayKey ?? schedule?.selectedDayKey,
+  Future<void> loadSchedule({String? dayKey}) => runLoad(
+        update: (state, error) {
+          scheduleState = state;
+          scheduleError = error;
+        },
+        fallbackError: 'Gagal memuat jadwal pelajaran.',
+        stateOnError: _emptyIfNoChild,
+        task: () async {
+          await _ensureChildrenLoaded();
+          final data = await repository.fetchSchedule(
+            parentUserId: _requireParentId,
+            childId: selectedChildId,
+            dayKey: dayKey ?? schedule?.selectedDayKey,
+          );
+          schedule = data;
+          selectedChildId = data.child.id;
+          return LoadState.ready;
+        },
       );
-      selectedChildId = schedule!.child.id;
-      scheduleState = LoadState.ready;
-    } on DataException catch (error) {
-      scheduleError = error.message;
-      scheduleState = error.code == 'no_linked_child'
-          ? LoadState.empty
-          : LoadState.error;
-    } catch (_) {
-      scheduleError = 'Gagal memuat jadwal pelajaran.';
-      scheduleState = LoadState.error;
-    }
-    notifyListeners();
-  }
 
   Future<void> selectScheduleDay(String dayKey) {
     return loadSchedule(dayKey: dayKey);
   }
 }
 
+/// Menyediakan [ParentController] ke semua layar di bawah `OrangtuaShell`.
 class ParentScope extends InheritedNotifier<ParentController> {
   const ParentScope({
     super.key,

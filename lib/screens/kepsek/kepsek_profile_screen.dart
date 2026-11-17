@@ -53,51 +53,33 @@ class KepsekProfileScreen extends StatelessWidget {
         ProfileActionTile(
           icon: Icons.bar_chart_rounded,
           label: 'Laporan akademik',
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => KepsekScope(
-                  controller: kepsek,
-                  child: const KepsekReportsScreen(),
-                ),
-              ),
-            );
-          },
+          onTap: () =>
+              _openWithScope(context, kepsek, const KepsekReportsScreen()),
         ),
         const SizedBox(height: 8),
         ProfileActionTile(
           icon: Icons.campaign_outlined,
           label: 'Pengumuman sekolah',
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => KepsekScope(
-                  controller: kepsek,
-                  child: const KepsekAnnouncementsScreen(),
-                ),
-              ),
-            );
-          },
+          onTap: () => _openWithScope(
+            context,
+            kepsek,
+            const KepsekAnnouncementsScreen(),
+          ),
         ),
         const SizedBox(height: 8),
         ProfileActionTile(
           icon: Icons.lock_outline_rounded,
           label: 'Ubah password',
-          onTap: () => _demo(context, 'Ubah password'),
+          onTap: () => showPendingFeature(context, 'Ubah password'),
         ),
         const SizedBox(height: 8),
         ProfileActionTile(
           icon: Icons.notifications_outlined,
           label: 'Preferensi notifikasi',
-          onTap: () => _demo(context, 'Preferensi notifikasi'),
+          onTap: () => showPendingFeature(context, 'Preferensi notifikasi'),
         ),
         const SizedBox(height: 16),
-        ProfileActionTile(
-          icon: Icons.logout_rounded,
-          label: 'Keluar',
-          danger: true,
-          onTap: session.isAuthenticating ? null : () => session.logout(),
-        ),
+        const ProfileLogoutTile(),
         const SizedBox(height: 12),
         Center(
           child: Text(
@@ -109,15 +91,16 @@ class KepsekProfileScreen extends StatelessWidget {
     );
   }
 
-  void _demo(BuildContext context, String label) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.navy,
-        content: Text(
-          '$label akan tersedia setelah integrasi backend.',
-          style: AppText.style(size: 13, color: Colors.white),
-        ),
+  /// Halaman yang di-push berada di luar [KepsekShell], jadi controller
+  /// harus disediakan ulang lewat [KepsekScope].
+  void _openWithScope(
+    BuildContext context,
+    KepsekController kepsek,
+    Widget page,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => KepsekScope(controller: kepsek, child: page),
       ),
     );
   }

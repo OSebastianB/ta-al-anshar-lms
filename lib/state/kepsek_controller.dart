@@ -3,11 +3,17 @@ import 'package:flutter/widgets.dart';
 import '../core/errors/data_exception.dart';
 import '../models/kepsek_models.dart';
 import '../repositories/kepsek_repository.dart';
+import 'async_runner.dart';
 import 'load_state.dart';
 
 export 'load_state.dart';
 
-class KepsekController extends ChangeNotifier {
+/// State layar role Kepala Sekolah: monitoring, laporan, persetujuan jadwal,
+/// dan pengumuman.
+///
+/// Semua request membawa `kepsekUserId` dari sesi (lihat [bindKepsek]) agar
+/// backend bisa memverifikasi bahwa pemanggil memang Kepala Sekolah.
+class KepsekController extends ChangeNotifier with AsyncRunner {
   KepsekController({required this.repository});
 
   final KepsekRepository repository;
@@ -37,6 +43,8 @@ class KepsekController extends ChangeNotifier {
   bool isUpdatingApproval = false;
   bool isSavingAnnouncement = false;
 
+  /// Mengikat controller ke akun yang login. Jika akun berganti, semua data
+  /// sebelumnya dibuang.
   void bindKepsek(String kepsekUserId) {
     if (_kepsekUserId == kepsekUserId) return;
     _kepsekUserId = kepsekUserId;
@@ -59,177 +67,152 @@ class KepsekController extends ChangeNotifier {
     return id;
   }
 
-  Future<void> loadDashboard() async {
-    dashboardState = LoadState.loading;
-    dashboardError = null;
-    notifyListeners();
-    try {
-      dashboard = await repository.fetchDashboard(kepsekUserId: _requireId);
-      dashboardState = LoadState.ready;
-    } on DataException catch (error) {
-      dashboardError = error.message;
-      dashboardState = LoadState.error;
-    } catch (_) {
-      dashboardError = 'Gagal memuat dashboard Kepala Sekolah.';
-      dashboardState = LoadState.error;
-    }
-    notifyListeners();
-  }
+  // ---------------------------------------------------------------------------
+  // Dashboard & monitoring
+  // ---------------------------------------------------------------------------
 
-  Future<void> loadAttendanceMonitoring({String? month}) async {
-    attendanceState = LoadState.loading;
-    attendanceError = null;
-    notifyListeners();
-    try {
-      attendanceMonitoring = await repository.fetchAttendanceMonitoring(
-        kepsekUserId: _requireId,
-        month: month,
+  Future<void> loadDashboard() => runLoad(
+        update: (state, error) {
+          dashboardState = state;
+          dashboardError = error;
+        },
+        fallbackError: 'Gagal memuat dashboard Kepala Sekolah.',
+        task: () async {
+          dashboard = await repository.fetchDashboard(kepsekUserId: _requireId);
+          return LoadState.ready;
+        },
       );
-      attendanceState = LoadState.ready;
-    } on DataException catch (error) {
-      attendanceError = error.message;
-      attendanceState = LoadState.error;
-    } catch (_) {
-      attendanceError = 'Gagal memuat monitoring kehadiran.';
-      attendanceState = LoadState.error;
-    }
-    notifyListeners();
-  }
 
+  Future<void> loadAttendanceMonitoring({String? month}) => runLoad(
+        update: (state, error) {
+          attendanceState = state;
+          attendanceError = error;
+        },
+        fallbackError: 'Gagal memuat monitoring kehadiran.',
+        task: () async {
+          attendanceMonitoring = await repository.fetchAttendanceMonitoring(
+            kepsekUserId: _requireId,
+            month: month,
+          );
+          return LoadState.ready;
+        },
+      );
+
+  /// Filter yang tidak diisi memakai filter yang sedang aktif.
   Future<void> loadScheduleMonitoring({
     String? classFilter,
     String? teacherFilter,
-  }) async {
-    scheduleState = LoadState.loading;
-    scheduleError = null;
-    notifyListeners();
-    try {
-      scheduleMonitoring = await repository.fetchScheduleMonitoring(
-        kepsekUserId: _requireId,
-        classFilter: classFilter ?? scheduleMonitoring?.selectedClass,
-        teacherFilter: teacherFilter ?? scheduleMonitoring?.selectedTeacher,
+  }) =>
+      runLoad(
+        update: (state, error) {
+          scheduleState = state;
+          scheduleError = error;
+        },
+        fallbackError: 'Gagal memuat monitoring jadwal.',
+        task: () async {
+          scheduleMonitoring = await repository.fetchScheduleMonitoring(
+            kepsekUserId: _requireId,
+            classFilter: classFilter ?? scheduleMonitoring?.selectedClass,
+            teacherFilter:
+                teacherFilter ?? scheduleMonitoring?.selectedTeacher,
+          );
+          return LoadState.ready;
+        },
       );
-      scheduleState = LoadState.ready;
-    } on DataException catch (error) {
-      scheduleError = error.message;
-      scheduleState = LoadState.error;
-    } catch (_) {
-      scheduleError = 'Gagal memuat monitoring jadwal.';
-      scheduleState = LoadState.error;
-    }
-    notifyListeners();
-  }
 
-  Future<void> loadAcademicReport() async {
-    reportState = LoadState.loading;
-    reportError = null;
-    notifyListeners();
-    try {
-      academicReport =
-          await repository.fetchAcademicReport(kepsekUserId: _requireId);
-      reportState = LoadState.ready;
-    } on DataException catch (error) {
-      reportError = error.message;
-      reportState = LoadState.error;
-    } catch (_) {
-      reportError = 'Gagal memuat laporan akademik.';
-      reportState = LoadState.error;
-    }
-    notifyListeners();
-  }
+  Future<void> loadAcademicReport() => runLoad(
+        update: (state, error) {
+          reportState = state;
+          reportError = error;
+        },
+        fallbackError: 'Gagal memuat laporan akademik.',
+        task: () async {
+          academicReport =
+              await repository.fetchAcademicReport(kepsekUserId: _requireId);
+          return LoadState.ready;
+        },
+      );
 
-  Future<void> loadApprovals() async {
-    approvalState = LoadState.loading;
-    approvalError = null;
-    notifyListeners();
-    try {
-      approvals =
-          await repository.fetchScheduleApprovals(kepsekUserId: _requireId);
-      approvalState =
-          approvals.isEmpty ? LoadState.empty : LoadState.ready;
-    } on DataException catch (error) {
-      approvalError = error.message;
-      approvalState = LoadState.error;
-    } catch (_) {
-      approvalError = 'Gagal memuat persetujuan jadwal.';
-      approvalState = LoadState.error;
-    }
-    notifyListeners();
-  }
+  // ---------------------------------------------------------------------------
+  // Persetujuan jadwal
+  // ---------------------------------------------------------------------------
 
+  Future<void> loadApprovals() => runLoad(
+        update: (state, error) {
+          approvalState = state;
+          approvalError = error;
+        },
+        fallbackError: 'Gagal memuat persetujuan jadwal.',
+        task: () async {
+          approvals =
+              await repository.fetchScheduleApprovals(kepsekUserId: _requireId);
+          return stateForList(approvals);
+        },
+      );
+
+  /// Setujui/tolak jadwal, lalu muat ulang daftar dan ringkasan dashboard
+  /// karena jumlah "menunggu persetujuan" ikut berubah.
   Future<void> updateApproval({
     required String approvalId,
     required ScheduleApprovalStatus status,
-  }) async {
-    isUpdatingApproval = true;
-    approvalError = null;
-    notifyListeners();
-    try {
-      await repository.updateApprovalStatus(
-        kepsekUserId: _requireId,
-        approvalId: approvalId,
-        status: status,
-      );
-      await loadApprovals();
-      await loadDashboard();
-    } on DataException catch (error) {
-      approvalError = error.message;
-      rethrow;
-    } catch (_) {
-      approvalError = 'Gagal memperbarui status persetujuan.';
-      throw DataException(approvalError!, code: 'unknown');
-    } finally {
-      isUpdatingApproval = false;
-      notifyListeners();
-    }
+  }) {
+    return runAction(
+      setBusy: (busy) => isUpdatingApproval = busy,
+      setError: (error) => approvalError = error,
+      fallbackError: 'Gagal memperbarui status persetujuan.',
+      task: () async {
+        await repository.updateApprovalStatus(
+          kepsekUserId: _requireId,
+          approvalId: approvalId,
+          status: status,
+        );
+        await loadApprovals();
+        await loadDashboard();
+      },
+    );
   }
 
-  Future<void> loadAnnouncements() async {
-    announcementState = LoadState.loading;
-    announcementError = null;
-    notifyListeners();
-    try {
-      announcements =
-          await repository.fetchAnnouncements(kepsekUserId: _requireId);
-      announcementState =
-          announcements.isEmpty ? LoadState.empty : LoadState.ready;
-    } on DataException catch (error) {
-      announcementError = error.message;
-      announcementState = LoadState.error;
-    } catch (_) {
-      announcementError = 'Gagal memuat pengumuman.';
-      announcementState = LoadState.error;
-    }
-    notifyListeners();
-  }
+  // ---------------------------------------------------------------------------
+  // Pengumuman
+  // ---------------------------------------------------------------------------
+
+  Future<void> loadAnnouncements() => runLoad(
+        update: (state, error) {
+          announcementState = state;
+          announcementError = error;
+        },
+        fallbackError: 'Gagal memuat pengumuman.',
+        task: () async {
+          announcements =
+              await repository.fetchAnnouncements(kepsekUserId: _requireId);
+          return stateForList(announcements);
+        },
+      );
 
   Future<void> createAnnouncement({
     required String title,
     required String body,
-  }) async {
-    isSavingAnnouncement = true;
-    announcementError = null;
-    notifyListeners();
-    try {
-      await repository.createAnnouncement(
-        kepsekUserId: _requireId,
-        title: title,
-        body: body,
-      );
-      await loadAnnouncements();
-    } on DataException catch (error) {
-      announcementError = error.message;
-      rethrow;
-    } catch (_) {
-      announcementError = 'Gagal membuat pengumuman.';
-      throw DataException(announcementError!, code: 'unknown');
-    } finally {
-      isSavingAnnouncement = false;
-      notifyListeners();
-    }
+  }) {
+    return runAction(
+      setBusy: (busy) => isSavingAnnouncement = busy,
+      setError: (error) => announcementError = error,
+      fallbackError: 'Gagal membuat pengumuman.',
+      task: () async {
+        await repository.createAnnouncement(
+          kepsekUserId: _requireId,
+          title: title,
+          body: body,
+        );
+        await loadAnnouncements();
+      },
+    );
   }
 }
 
+/// Menyediakan [KepsekController] ke semua layar di bawah `KepsekShell`.
+///
+/// Halaman yang di-push dengan `Navigator` berada di luar shell, jadi harus
+/// dibungkus ulang dengan [KepsekScope] (lihat `KepsekProfileScreen`).
 class KepsekScope extends InheritedNotifier<KepsekController> {
   const KepsekScope({
     super.key,
