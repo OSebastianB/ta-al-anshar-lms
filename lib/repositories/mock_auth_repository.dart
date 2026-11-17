@@ -21,9 +21,7 @@ class _DemoAccount {
   final UserAccount user;
 }
 
-/// Autentikasi mock untuk pengembangan tanpa backend.
-/// Password disimpan sebagai hash (SHA-256 + pepper), bukan plaintext.
-/// Ganti ke implementasi API tanpa mengubah layar login.
+/// Autentikasi mock (tanpa backend). Password disimpan sebagai hash.
 class MockAuthRepository implements AuthRepository {
   MockAuthRepository({
     this.networkDelay = AppConfig.mockNetworkDelay,
@@ -31,8 +29,6 @@ class MockAuthRepository implements AuthRepository {
 
   final Duration networkDelay;
 
-  /// Hash pra-komputasi: PasswordHasher.hash(password, username).
-  /// Password plaintext tidak ada di sumber kode akun.
   static const List<_DemoAccount> _accounts = [
     _DemoAccount(
       username: 'ratna@alanshar.sch.id',
@@ -92,13 +88,11 @@ class MockAuthRepository implements AuthRepository {
     ),
   ];
 
-  /// Username demo untuk hint UI (password tidak diisi otomatis).
   static String demoUsernameFor(AppRole role) {
     final account = _accounts.firstWhere((item) => item.user.role == role);
     return account.username;
   }
 
-  /// Prefill password demo hanya jika diizinkan (default off).
   static String? demoPasswordHintFor(AppRole role) {
     if (!AppConfig.allowDemoPasswordPrefill) return null;
     return switch (role) {
@@ -106,14 +100,6 @@ class MockAuthRepository implements AuthRepository {
       AppRole.orangTua => 'demo',
       AppRole.kepalaSekolah => 'demo',
     };
-  }
-
-  @Deprecated('Gunakan demoUsernameFor + input password manual')
-  static ({String username, String password}) demoCredentialsFor(AppRole role) {
-    return (
-      username: demoUsernameFor(role),
-      password: demoPasswordHintFor(role) ?? '',
-    );
   }
 
   static List<({AppRole role, String username})> get demoDirectory {
@@ -149,7 +135,6 @@ class MockAuthRepository implements AuthRepository {
       );
     }
 
-    // Jitter kecil agar timing response tidak mudah membedakan user ada/tidak.
     await Future<void>.delayed(
       Duration(milliseconds: 40 + Random.secure().nextInt(80)),
     );

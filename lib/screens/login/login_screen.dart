@@ -1,6 +1,5 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../core/config/app_config.dart';
 import '../../core/errors/auth_exception.dart';
 import '../../repositories/mock_auth_repository.dart';
 import '../../state/session_controller.dart';
@@ -279,7 +278,7 @@ class _LoginCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Pilih akun demo (username saja)',
+            'Akun demo',
             style: AppText.style(
               size: 13,
               weight: FontWeight.w600,
@@ -323,9 +322,7 @@ class _LoginCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            AppConfig.allowDemoPasswordPrefill
-                ? 'Mode demo: password ikut terisi. Admin memakai website.'
-                : 'Password harus diketik manual. Admin memakai website.',
+            'Admin sekolah memakai website desktop.',
             style: AppText.style(size: 11.5, color: AppColors.muted),
           ),
           const SizedBox(height: 12),
@@ -451,7 +448,7 @@ class _LoginCard extends StatelessWidget {
           const SizedBox(height: 12),
           Center(
             child: Text(
-              'Sesi terenkripsi · password tidak disimpan',
+              'SD Islam Al-Anshar · Kota Bekasi',
               style: AppText.style(size: 11.5, color: AppColors.muted),
             ),
           ),

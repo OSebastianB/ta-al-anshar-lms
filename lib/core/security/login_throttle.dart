@@ -1,5 +1,3 @@
-/// Pembatas percobaan login lokal untuk mengurangi brute-force di perangkat.
-/// Proteksi penuh tetap membutuhkan rate-limit di server.
 class LoginThrottle {
   LoginThrottle({
     this.maxAttempts = 5,
@@ -13,7 +11,6 @@ class LoginThrottle {
 
   String _key(String username) => username.trim().toLowerCase();
 
-  /// Sisa waktu lockout; null jika tidak terkunci.
   Duration? remainingLockout(String username) {
     final state = _states[_key(username)];
     if (state == null || state.lockedUntil == null) return null;

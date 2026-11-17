@@ -5,8 +5,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../models/auth_session.dart';
 import 'session_storage.dart';
 
-/// Menyimpan sesi di encrypted storage perangkat (Keystore/Keychain).
-/// Password tidak pernah disimpan.
 class SecureSessionStorage implements SessionStorage {
   SecureSessionStorage({FlutterSecureStorage? storage})
       : _storage = storage ??

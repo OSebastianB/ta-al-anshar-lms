@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
 
-/// Generator token acak kryptografis (bukan timestamp tebak-tebakan).
 abstract final class SecureToken {
   static final Random _rng = Random.secure();
 
